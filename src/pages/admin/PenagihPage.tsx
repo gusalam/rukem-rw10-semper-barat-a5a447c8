@@ -17,25 +17,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, Search, Users, MapPin, Trash2, Edit, UserCheck } from 'lucide-react';
+import { Plus, Search, Users, MapPin, Trash2, Edit, UserCheck, Eye, EyeOff } from 'lucide-react';
 import type { PenagihWilayah } from '@/types/database';
 import { getErrorMessage, StandardMessages } from '@/lib/error-messages';
-
-interface UserWithRole {
-  user_id: string;
-  email: string;
-  full_name: string | null;
-  role: string;
-}
 
 interface PenagihWithWilayah {
   user_id: string;
@@ -46,7 +32,6 @@ interface PenagihWithWilayah {
 
 export default function PenagihPage() {
   const [penagihList, setPenagihList] = useState<PenagihWithWilayah[]>([]);
-  const [availableUsers, setAvailableUsers] = useState<UserWithRole[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -54,8 +39,11 @@ export default function PenagihPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedPenagih, setSelectedPenagih] = useState<PenagihWithWilayah | null>(null);
   const [selectedWilayah, setSelectedWilayah] = useState<PenagihWilayah | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
-    user_id: '',
+    nama_lengkap: '',
+    email: '',
+    password: '',
     rt: '',
     rw: '',
   });
@@ -78,7 +66,7 @@ export default function PenagihPage() {
         .select('user_id, role')
         .eq('role', 'penagih');
 
-      // Get user details from profiles (we can't query auth.users directly)
+      // Get user details from profiles
       const penagihUserIds = rolesData?.map(r => r.user_id) || [];
       
       const { data: profilesData } = await supabase
@@ -98,34 +86,13 @@ export default function PenagihPage() {
         
         return {
           user_id: userId,
-          email: '', // We don't have access to email from profiles
+          email: '',
           full_name: profile?.full_name || 'Penagih',
           wilayah: userWilayah,
         };
       });
 
       setPenagihList(penagihWithWilayah);
-
-      // Fetch users who could become penagih (those with anggota role or no penagih role)
-      const { data: allRoles } = await supabase
-        .from('user_roles')
-        .select('user_id, role');
-
-      const { data: allProfiles } = await supabase
-        .from('profiles')
-        .select('user_id, full_name');
-
-      const usersNotPenagih = allProfiles?.filter(p => {
-        const userRole = allRoles?.find(r => r.user_id === p.user_id);
-        return !userRole || userRole.role !== 'penagih';
-      }).map(p => ({
-        user_id: p.user_id,
-        email: '',
-        full_name: p.full_name,
-        role: allRoles?.find(r => r.user_id === p.user_id)?.role || 'anggota',
-      })) || [];
-
-      setAvailableUsers(usersNotPenagih);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -134,7 +101,8 @@ export default function PenagihPage() {
   };
 
   const resetForm = () => {
-    setFormData({ user_id: '', rt: '', rw: '' });
+    setFormData({ nama_lengkap: '', email: '', password: '', rt: '', rw: '' });
+    setShowPassword(false);
   };
 
   const openWilayahDialog = (penagih: PenagihWithWilayah, wilayah?: PenagihWilayah) => {
@@ -156,48 +124,54 @@ export default function PenagihPage() {
   const handleAddPenagih = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.user_id || !formData.rt || !formData.rw) {
+    if (!formData.nama_lengkap || !formData.email || !formData.password || !formData.rt || !formData.rw) {
       toast({
         variant: 'destructive',
         title: 'Data Belum Lengkap',
-        description: StandardMessages.validation.required,
+        description: 'Semua field wajib diisi.',
+      });
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      toast({
+        variant: 'destructive',
+        title: 'Password Terlalu Pendek',
+        description: 'Password minimal 6 karakter.',
       });
       return;
     }
 
     setSubmitting(true);
     try {
-      // Check if user already has penagih role
-      const { data: existingRole } = await supabase
-        .from('user_roles')
-        .select('id')
-        .eq('user_id', formData.user_id)
-        .eq('role', 'penagih')
-        .maybeSingle();
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
 
-      if (!existingRole) {
-        // Add penagih role
-        const { error: roleError } = await supabase
-          .from('user_roles')
-          .insert({ user_id: formData.user_id, role: 'penagih' });
-        
-        if (roleError) throw roleError;
+      if (!token) {
+        throw new Error('Sesi tidak valid. Silakan login ulang.');
       }
 
-      // Add wilayah
-      const { error: wilayahError } = await supabase
-        .from('penagih_wilayah')
-        .insert({
-          penagih_user_id: formData.user_id,
+      const response = await supabase.functions.invoke('create-penagih-account', {
+        body: {
+          email: formData.email,
+          password: formData.password,
+          nama_lengkap: formData.nama_lengkap,
           rt: formData.rt,
           rw: formData.rw,
-        });
+        },
+      });
 
-      if (wilayahError) throw wilayahError;
+      if (response.error) {
+        throw new Error(response.error.message || 'Gagal membuat akun penagih');
+      }
+
+      if (response.data?.error) {
+        throw new Error(response.data.error);
+      }
 
       toast({
-        title: '✓ Penagih Ditambahkan',
-        description: 'Penagih dan wilayah berhasil ditambahkan.',
+        title: '✓ Penagih Berhasil Dibuat',
+        description: `Akun penagih ${formData.nama_lengkap} berhasil dibuat.`,
       });
       setDialogOpen(false);
       resetForm();
@@ -205,7 +179,7 @@ export default function PenagihPage() {
     } catch (error: any) {
       toast({
         variant: 'destructive',
-        title: 'Gagal Menambahkan',
+        title: 'Gagal Membuat Akun',
         description: getErrorMessage(error, StandardMessages.error.save),
       });
     } finally {
@@ -379,36 +353,50 @@ export default function PenagihPage() {
               Tambah Penagih
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Tambah Penagih Baru</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleAddPenagih} className="space-y-4">
               <div className="space-y-1.5">
-                <Label>Pilih User <span className="text-destructive">*</span></Label>
-                <Select
-                  value={formData.user_id}
-                  onValueChange={(value) => setFormData({ ...formData, user_id: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih user..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableUsers.map((user) => (
-                      <SelectItem key={user.user_id} value={user.user_id}>
-                        <div className="flex flex-col">
-                          <span>{user.full_name || 'User'}</span>
-                          <span className="text-xs text-muted-foreground capitalize">
-                            Role saat ini: {user.role}
-                          </span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  User akan otomatis mendapat role Penagih
-                </p>
+                <Label>Nama Lengkap <span className="text-destructive">*</span></Label>
+                <Input
+                  value={formData.nama_lengkap}
+                  onChange={(e) => setFormData({ ...formData, nama_lengkap: e.target.value })}
+                  placeholder="Masukkan nama lengkap"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Email <span className="text-destructive">*</span></Label>
+                <Input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="penagih@email.com"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Password <span className="text-destructive">*</span></Label>
+                <div className="relative">
+                  <Input
+                    type={showPassword ? 'text' : 'password'}
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    placeholder="Minimal 6 karakter"
+                    className="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -430,12 +418,16 @@ export default function PenagihPage() {
                 </div>
               </div>
 
+              <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
+                Akun penagih akan otomatis dibuat dengan role "Penagih" dan dapat langsung login menggunakan email dan password di atas.
+              </p>
+
               <div className="flex gap-2 justify-end">
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                   Batal
                 </Button>
                 <Button type="submit" disabled={submitting}>
-                  {submitting ? 'Menyimpan...' : 'Simpan'}
+                  {submitting ? 'Membuat Akun...' : 'Buat Akun Penagih'}
                 </Button>
               </div>
             </form>
@@ -458,7 +450,7 @@ export default function PenagihPage() {
           <EmptyState
             icon={Users}
             title="Belum Ada Penagih"
-            description="Klik tombol 'Tambah Penagih' untuk menambahkan penagih baru."
+            description="Klik tombol 'Tambah Penagih' untuk membuat akun penagih baru."
           />
         ) : (
           <>
