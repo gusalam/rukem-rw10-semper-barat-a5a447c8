@@ -1,0 +1,4 @@
+project_id = "dufqdszjnorgjixelynf"
+
+[functions.create-anggota-account]
+verify_jwt = false
