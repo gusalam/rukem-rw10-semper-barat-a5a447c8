@@ -11,10 +11,11 @@ import { ExportButtons } from '@/components/ui/export-buttons';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Users, Receipt, Wallet, HandHeart, Home, ChevronDown, ChevronRight, Filter } from 'lucide-react';
-import type { Anggota, IuranTagihan, Kas, Santunan } from '@/types/database';
+import type { Anggota, IuranTagihan, IuranPembayaran, Kas, Santunan } from '@/types/database';
 import { formatCurrency, formatDate, formatPeriode } from '@/lib/format';
 import { exportToPDF, exportToExcel } from '@/lib/export';
 import { cn } from '@/lib/utils';
+import { RekapBulanan } from '@/components/admin/RekapBulanan';
 
 interface KKTagihanReport {
   no_kk: string;
@@ -29,6 +30,7 @@ interface KKTagihanReport {
 export default function LaporanPage() {
   const [anggotaList, setAnggotaList] = useState<Anggota[]>([]);
   const [tagihanList, setTagihanList] = useState<IuranTagihan[]>([]);
+  const [pembayaranList, setPembayaranList] = useState<IuranPembayaran[]>([]);
   const [kasList, setKasList] = useState<Kas[]>([]);
   const [santunanList, setSantunanList] = useState<Santunan[]>([]);
   const [kkTagihanReport, setKkTagihanReport] = useState<KKTagihanReport[]>([]);
@@ -69,9 +71,10 @@ export default function LaporanPage() {
 
   const fetchData = async () => {
     try {
-      const [anggotaRes, tagihanRes, kasRes, santunanRes] = await Promise.all([
+      const [anggotaRes, tagihanRes, pembayaranRes, kasRes, santunanRes] = await Promise.all([
         supabase.from('anggota').select('*').order('nama_lengkap'),
         supabase.from('iuran_tagihan').select('*').order('jatuh_tempo', { ascending: false }),
+        supabase.from('iuran_pembayaran').select('*, tagihan:iuran_tagihan(*)').order('created_at', { ascending: false }),
         supabase.from('kas').select('*').order('created_at', { ascending: false }),
         supabase.from('santunan').select('*, anggota(*), kematian(*)').order('created_at', { ascending: false }),
       ]);
@@ -81,6 +84,7 @@ export default function LaporanPage() {
 
       setAnggotaList(anggota);
       setTagihanList(tagihan);
+      setPembayaranList(pembayaranRes.data as IuranPembayaran[] || []);
       setKasList(kasRes.data as Kas[] || []);
       setSantunanList(santunanRes.data as Santunan[] || []);
 
@@ -344,14 +348,23 @@ export default function LaporanPage() {
         />
       </div>
 
-      <Tabs defaultValue="tagihan-kk" className="mt-6">
-        <TabsList className="w-full md:w-auto grid grid-cols-5 md:flex">
+      <Tabs defaultValue="rekap" className="mt-6">
+        <TabsList className="w-full md:w-auto grid grid-cols-6 md:flex">
+          <TabsTrigger value="rekap">Rekap Bulanan</TabsTrigger>
           <TabsTrigger value="tagihan-kk">Tagihan per KK</TabsTrigger>
           <TabsTrigger value="anggota">Anggota</TabsTrigger>
           <TabsTrigger value="tagihan">Tagihan</TabsTrigger>
           <TabsTrigger value="kas">Kas</TabsTrigger>
           <TabsTrigger value="santunan">Santunan</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="rekap" className="mt-4">
+          <RekapBulanan 
+            tagihanList={tagihanList} 
+            pembayaranList={pembayaranList}
+            kasList={kasList}
+          />
+        </TabsContent>
 
         <TabsContent value="tagihan-kk" className="mt-4">
           <Card>
