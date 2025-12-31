@@ -8,7 +8,6 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import AuthPage from "./pages/AuthPage";
 import AdminDashboard from "./pages/admin/Dashboard";
 import AnggotaPage from "./pages/admin/AnggotaPage";
-import IuranPage from "./pages/admin/IuranPage";
 import KasPage from "./pages/admin/KasPage";
 import KematianPage from "./pages/admin/KematianPage";
 import SantunanPage from "./pages/admin/SantunanPage";
@@ -70,7 +69,7 @@ const App = () => (
             {/* Admin Routes */}
             <Route path="/admin" element={<ProtectedRoute requiredRole="admin"><AdminDashboard /></ProtectedRoute>} />
             <Route path="/admin/anggota" element={<ProtectedRoute requiredRole="admin"><AnggotaPage /></ProtectedRoute>} />
-            <Route path="/admin/iuran" element={<ProtectedRoute requiredRole="admin"><IuranPage /></ProtectedRoute>} />
+            {/* Route /admin/iuran dihapus - gunakan /admin/tagihan */}
             <Route path="/admin/tagihan" element={<ProtectedRoute requiredRole="admin"><TagihanPage /></ProtectedRoute>} />
             <Route path="/admin/pembayaran" element={<ProtectedRoute requiredRole="admin"><PembayaranPage /></ProtectedRoute>} />
             <Route path="/admin/penagih" element={<ProtectedRoute requiredRole="admin"><PenagihPage /></ProtectedRoute>} />

@@ -12,7 +12,6 @@ import {
   Heart,
   LayoutDashboard,
   Users,
-  Receipt,
   ClipboardList,
   CreditCard,
   UserCheck,
@@ -23,15 +22,13 @@ import {
   Settings,
   LogOut,
   Menu,
-  Bell,
   ChevronRight,
 } from 'lucide-react';
 
 const adminMenuItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/admin' },
   { icon: Users, label: 'Anggota', href: '/admin/anggota' },
-  { icon: Receipt, label: 'Iuran Lama', href: '/admin/iuran' },
-  { icon: ClipboardList, label: 'Tagihan per KK', href: '/admin/tagihan' },
+  { icon: ClipboardList, label: 'Tagihan', href: '/admin/tagihan' },
   { icon: CreditCard, label: 'Verifikasi Bayar', href: '/admin/pembayaran' },
   { icon: UserCheck, label: 'Penagih', href: '/admin/penagih' },
   { icon: Wallet, label: 'Kas', href: '/admin/kas' },
