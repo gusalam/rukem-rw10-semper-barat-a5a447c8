@@ -10,6 +10,7 @@ import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog';
 import { Badge } from '@/components/ui/badge';
 import { AdminDashboardSkeleton } from '@/components/ui/admin-loading-skeleton';
 import { useToast } from '@/hooks/use-toast';
+import { Switch } from '@/components/ui/switch';
 import {
   Dialog,
   DialogContent,
@@ -19,14 +20,20 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, Search, Users, MapPin, Trash2, Edit, UserCheck, Eye, EyeOff } from 'lucide-react';
+import { Plus, Search, Users, MapPin, Trash2, Edit, UserCheck, Eye, EyeOff, Power } from 'lucide-react';
 import type { PenagihWilayah } from '@/types/database';
 import { getErrorMessage, StandardMessages } from '@/lib/error-messages';
 
-interface PenagihWithWilayah {
+interface PenagihData {
+  id: string;
   user_id: string;
-  email: string;
-  full_name: string | null;
+  nama_lengkap: string;
+  email: string | null;
+  status_aktif: boolean;
+  created_at: string;
+}
+
+interface PenagihWithWilayah extends PenagihData {
   wilayah: PenagihWilayah[];
 }
 
@@ -60,19 +67,18 @@ export default function PenagihPage() {
 
   const fetchData = async () => {
     try {
-      // Fetch users with penagih role
-      const { data: rolesData } = await supabase
-        .from('user_roles')
-        .select('user_id, role')
-        .eq('role', 'penagih');
+      // Fetch penagih data from penagih table
+      const { data: penagihData, error: penagihError } = await supabase
+        .from('penagih')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-      // Get user details from profiles
-      const penagihUserIds = rolesData?.map(r => r.user_id) || [];
-      
-      const { data: profilesData } = await supabase
-        .from('profiles')
-        .select('user_id, full_name')
-        .in('user_id', penagihUserIds);
+      if (penagihError) {
+        console.error('Error fetching penagih:', penagihError);
+        // Fallback to old method if table doesn't exist
+        await fetchDataLegacy();
+        return;
+      }
 
       // Fetch wilayah for each penagih
       const { data: wilayahData } = await supabase
@@ -80,14 +86,10 @@ export default function PenagihPage() {
         .select('*');
 
       // Combine data
-      const penagihWithWilayah: PenagihWithWilayah[] = penagihUserIds.map(userId => {
-        const profile = profilesData?.find(p => p.user_id === userId);
-        const userWilayah = wilayahData?.filter(w => w.penagih_user_id === userId) || [];
-        
+      const penagihWithWilayah: PenagihWithWilayah[] = (penagihData || []).map(p => {
+        const userWilayah = wilayahData?.filter(w => w.penagih_user_id === p.user_id) || [];
         return {
-          user_id: userId,
-          email: '',
-          full_name: profile?.full_name || 'Penagih',
+          ...p,
           wilayah: userWilayah,
         };
       });
@@ -98,6 +100,42 @@ export default function PenagihPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Legacy fetch for backwards compatibility
+  const fetchDataLegacy = async () => {
+    const { data: rolesData } = await supabase
+      .from('user_roles')
+      .select('user_id, role')
+      .eq('role', 'penagih');
+
+    const penagihUserIds = rolesData?.map(r => r.user_id) || [];
+    
+    const { data: profilesData } = await supabase
+      .from('profiles')
+      .select('user_id, full_name')
+      .in('user_id', penagihUserIds);
+
+    const { data: wilayahData } = await supabase
+      .from('penagih_wilayah')
+      .select('*');
+
+    const penagihWithWilayah: PenagihWithWilayah[] = penagihUserIds.map(userId => {
+      const profile = profilesData?.find(p => p.user_id === userId);
+      const userWilayah = wilayahData?.filter(w => w.penagih_user_id === userId) || [];
+      
+      return {
+        id: userId,
+        user_id: userId,
+        nama_lengkap: profile?.full_name || 'Penagih',
+        email: null,
+        status_aktif: true,
+        created_at: new Date().toISOString(),
+        wilayah: userWilayah,
+      };
+    });
+
+    setPenagihList(penagihWithWilayah);
   };
 
   const resetForm = () => {
@@ -119,6 +157,32 @@ export default function PenagihPage() {
     setSelectedPenagih(penagih);
     setSelectedWilayah(wilayah);
     setDeleteDialogOpen(true);
+  };
+
+  const handleToggleStatus = async (penagih: PenagihWithWilayah) => {
+    try {
+      const newStatus = !penagih.status_aktif;
+      
+      const { error } = await supabase
+        .from('penagih')
+        .update({ status_aktif: newStatus })
+        .eq('id', penagih.id);
+
+      if (error) throw error;
+
+      toast({
+        title: newStatus ? '✓ Penagih Diaktifkan' : '✓ Penagih Dinonaktifkan',
+        description: `Status ${penagih.nama_lengkap} berhasil diubah.`,
+      });
+
+      fetchData();
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Gagal Mengubah Status',
+        description: getErrorMessage(error, 'Terjadi kesalahan'),
+      });
+    }
   };
 
   const handleAddPenagih = async (e: React.FormEvent) => {
@@ -202,7 +266,6 @@ export default function PenagihPage() {
     setSubmitting(true);
     try {
       if (selectedWilayah) {
-        // Update existing
         const { error } = await supabase
           .from('penagih_wilayah')
           .update({
@@ -214,7 +277,6 @@ export default function PenagihPage() {
         if (error) throw error;
         toast({ title: '✓ Wilayah Diperbarui', description: 'Data wilayah berhasil diperbarui.' });
       } else {
-        // Add new wilayah
         const { error } = await supabase
           .from('penagih_wilayah')
           .insert({
@@ -252,16 +314,6 @@ export default function PenagihPage() {
 
       if (error) throw error;
 
-      // If no more wilayah, remove penagih role
-      const remainingWilayah = selectedPenagih?.wilayah.filter(w => w.id !== selectedWilayah.id) || [];
-      if (remainingWilayah.length === 0 && selectedPenagih) {
-        await supabase
-          .from('user_roles')
-          .delete()
-          .eq('user_id', selectedPenagih.user_id)
-          .eq('role', 'penagih');
-      }
-
       toast({ title: '✓ Wilayah Dihapus', description: 'Wilayah berhasil dihapus.' });
       setDeleteDialogOpen(false);
       fetchData();
@@ -277,7 +329,8 @@ export default function PenagihPage() {
   };
 
   const filteredPenagih = penagihList.filter((p) =>
-    p.full_name?.toLowerCase().includes(search.toLowerCase()) ||
+    p.nama_lengkap?.toLowerCase().includes(search.toLowerCase()) ||
+    p.email?.toLowerCase().includes(search.toLowerCase()) ||
     p.wilayah.some(w => w.rt.includes(search) || w.rw.includes(search))
   );
 
@@ -287,12 +340,12 @@ export default function PenagihPage() {
       header: 'Nama Penagih',
       cell: (item: PenagihWithWilayah) => (
         <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10">
-            <UserCheck className="h-5 w-5 text-primary" />
+          <div className={`flex items-center justify-center w-10 h-10 rounded-full ${item.status_aktif ? 'bg-primary/10' : 'bg-muted'}`}>
+            <UserCheck className={`h-5 w-5 ${item.status_aktif ? 'text-primary' : 'text-muted-foreground'}`} />
           </div>
           <div>
-            <p className="font-medium">{item.full_name || 'Penagih'}</p>
-            <p className="text-xs text-muted-foreground">{item.wilayah.length} wilayah</p>
+            <p className="font-medium">{item.nama_lengkap}</p>
+            <p className="text-xs text-muted-foreground">{item.email || 'Email tidak tersedia'}</p>
           </div>
         </div>
       ),
@@ -310,6 +363,21 @@ export default function PenagihPage() {
           {item.wilayah.length === 0 && (
             <span className="text-muted-foreground text-sm">Belum ada wilayah</span>
           )}
+        </div>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      cell: (item: PenagihWithWilayah) => (
+        <div className="flex items-center gap-2">
+          <Switch
+            checked={item.status_aktif}
+            onCheckedChange={() => handleToggleStatus(item)}
+          />
+          <Badge variant={item.status_aktif ? 'default' : 'secondary'}>
+            {item.status_aktif ? 'Aktif' : 'Nonaktif'}
+          </Badge>
         </div>
       ),
     },
@@ -439,7 +507,7 @@ export default function PenagihPage() {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Cari nama atau wilayah..."
+            placeholder="Cari nama, email, atau wilayah..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
@@ -459,15 +527,32 @@ export default function PenagihPage() {
             {/* Detail Cards */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {filteredPenagih.map((penagih) => (
-                <Card key={penagih.user_id}>
+                <Card key={penagih.id} className={!penagih.status_aktif ? 'opacity-60' : ''}>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <UserCheck className="h-4 w-4 text-primary" />
-                      {penagih.full_name || 'Penagih'}
-                    </CardTitle>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <UserCheck className={`h-4 w-4 ${penagih.status_aktif ? 'text-primary' : 'text-muted-foreground'}`} />
+                        {penagih.nama_lengkap}
+                      </CardTitle>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={penagih.status_aktif}
+                          onCheckedChange={() => handleToggleStatus(penagih)}
+                        />
+                      </div>
+                    </div>
+                    {penagih.email && (
+                      <p className="text-xs text-muted-foreground">{penagih.email}</p>
+                    )}
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm text-muted-foreground">Status:</p>
+                        <Badge variant={penagih.status_aktif ? 'default' : 'secondary'}>
+                          {penagih.status_aktif ? 'Aktif' : 'Nonaktif'}
+                        </Badge>
+                      </div>
                       <p className="text-sm text-muted-foreground">Wilayah Tugas:</p>
                       {penagih.wilayah.map((w) => (
                         <div key={w.id} className="flex items-center justify-between bg-muted/50 p-2 rounded-lg">
@@ -498,6 +583,15 @@ export default function PenagihPage() {
                       {penagih.wilayah.length === 0 && (
                         <p className="text-sm text-muted-foreground italic">Belum ada wilayah</p>
                       )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full mt-2"
+                        onClick={() => openWilayahDialog(penagih)}
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Tambah Wilayah
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -517,7 +611,7 @@ export default function PenagihPage() {
           </DialogHeader>
           <form onSubmit={handleSaveWilayah} className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Penagih: <strong>{selectedPenagih?.full_name || 'Penagih'}</strong>
+              Penagih: <strong>{selectedPenagih?.nama_lengkap || 'Penagih'}</strong>
             </p>
             
             <div className="grid grid-cols-2 gap-4">

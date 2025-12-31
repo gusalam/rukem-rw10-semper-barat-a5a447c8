@@ -481,6 +481,36 @@ export type Database = {
           },
         ]
       }
+      penagih: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          nama_lengkap: string
+          status_aktif: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          nama_lengkap: string
+          status_aktif?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          nama_lengkap?: string
+          status_aktif?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       penagih_wilayah: {
         Row: {
           created_at: string
