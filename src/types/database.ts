@@ -1,9 +1,7 @@
 export type AppRole = 'admin' | 'anggota' | 'penagih';
 export type StatusAnggota = 'aktif' | 'nonaktif' | 'meninggal';
-export type StatusIuran = 'belum_bayar' | 'menunggu_verifikasi' | 'lunas' | 'ditolak';
 export type StatusTagihan = 'belum_bayar' | 'menunggu_admin' | 'lunas';
 export type StatusPembayaranTagihan = 'menunggu_admin' | 'disetujui' | 'ditolak';
-export type JenisIuran = 'bulanan' | 'per_kejadian' | 'darurat';
 export type JenisKas = 'pemasukan' | 'pengeluaran';
 export type MetodePembayaran = 'tunai' | 'transfer' | 'qris';
 export type StatusSantunan = 'pending' | 'diproses' | 'disalurkan';
@@ -76,22 +74,6 @@ export interface KeluargaAnggota {
   created_at: string;
 }
 
-// Legacy iuran table (for backward compatibility)
-export interface Iuran {
-  id: string;
-  anggota_id: string;
-  no_kk: string | null;
-  periode: string;
-  jenis: JenisIuran;
-  nominal: number;
-  status: StatusIuran;
-  jatuh_tempo: string;
-  keterangan: string | null;
-  created_at: string;
-  updated_at: string;
-  anggota?: Anggota;
-}
-
 // New tagihan system (per KK)
 export interface IuranTagihan {
   id: string;
@@ -132,23 +114,6 @@ export interface PenagihWilayah {
   rt: string;
   rw: string;
   created_at: string;
-}
-
-export interface PembayaranIuran {
-  id: string;
-  iuran_id: string;
-  anggota_id: string;
-  bukti_url: string | null;
-  nominal: number;
-  metode: MetodePembayaran;
-  tanggal_bayar: string;
-  catatan: string | null;
-  verified_by: string | null;
-  verified_at: string | null;
-  alasan_tolak: string | null;
-  created_at: string;
-  iuran?: Iuran;
-  anggota?: Anggota;
 }
 
 export interface Kas {
