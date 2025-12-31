@@ -131,56 +131,6 @@ export type Database = {
         }
         Relationships: []
       }
-      iuran: {
-        Row: {
-          anggota_id: string
-          created_at: string
-          id: string
-          jatuh_tempo: string
-          jenis: Database["public"]["Enums"]["jenis_iuran"]
-          keterangan: string | null
-          no_kk: string | null
-          nominal: number
-          periode: string
-          status: Database["public"]["Enums"]["status_iuran"]
-          updated_at: string
-        }
-        Insert: {
-          anggota_id: string
-          created_at?: string
-          id?: string
-          jatuh_tempo: string
-          jenis?: Database["public"]["Enums"]["jenis_iuran"]
-          keterangan?: string | null
-          no_kk?: string | null
-          nominal: number
-          periode: string
-          status?: Database["public"]["Enums"]["status_iuran"]
-          updated_at?: string
-        }
-        Update: {
-          anggota_id?: string
-          created_at?: string
-          id?: string
-          jatuh_tempo?: string
-          jenis?: Database["public"]["Enums"]["jenis_iuran"]
-          keterangan?: string | null
-          no_kk?: string | null
-          nominal?: number
-          periode?: string
-          status?: Database["public"]["Enums"]["status_iuran"]
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "iuran_anggota_id_fkey"
-            columns: ["anggota_id"]
-            isOneToOne: false
-            referencedRelation: "anggota"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       iuran_pembayaran: {
         Row: {
           alasan_tolak: string | null
@@ -420,66 +370,6 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
-      }
-      pembayaran_iuran: {
-        Row: {
-          alasan_tolak: string | null
-          anggota_id: string
-          bukti_url: string | null
-          catatan: string | null
-          created_at: string
-          id: string
-          iuran_id: string
-          metode: Database["public"]["Enums"]["metode_pembayaran"]
-          nominal: number
-          tanggal_bayar: string
-          verified_at: string | null
-          verified_by: string | null
-        }
-        Insert: {
-          alasan_tolak?: string | null
-          anggota_id: string
-          bukti_url?: string | null
-          catatan?: string | null
-          created_at?: string
-          id?: string
-          iuran_id: string
-          metode?: Database["public"]["Enums"]["metode_pembayaran"]
-          nominal: number
-          tanggal_bayar?: string
-          verified_at?: string | null
-          verified_by?: string | null
-        }
-        Update: {
-          alasan_tolak?: string | null
-          anggota_id?: string
-          bukti_url?: string | null
-          catatan?: string | null
-          created_at?: string
-          id?: string
-          iuran_id?: string
-          metode?: Database["public"]["Enums"]["metode_pembayaran"]
-          nominal?: number
-          tanggal_bayar?: string
-          verified_at?: string | null
-          verified_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pembayaran_iuran_anggota_id_fkey"
-            columns: ["anggota_id"]
-            isOneToOne: false
-            referencedRelation: "anggota"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pembayaran_iuran_iuran_id_fkey"
-            columns: ["iuran_id"]
-            isOneToOne: false
-            referencedRelation: "iuran"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       penagih: {
         Row: {

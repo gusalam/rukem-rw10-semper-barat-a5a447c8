@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
-type TableName = 'iuran' | 'pembayaran_iuran' | 'kas' | 'kematian' | 'santunan' | 'anggota' | 'notifikasi' | 'iuran_tagihan' | 'iuran_pembayaran' | 'penagih_wilayah';
+type TableName = 'kas' | 'kematian' | 'santunan' | 'anggota' | 'notifikasi' | 'iuran_tagihan' | 'iuran_pembayaran' | 'penagih_wilayah' | 'penagih';
 
 interface UseRealtimeOptions {
   table: TableName;

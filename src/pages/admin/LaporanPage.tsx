@@ -11,57 +11,57 @@ import { ExportButtons } from '@/components/ui/export-buttons';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Users, Receipt, Wallet, HandHeart, Home, ChevronDown, ChevronRight, Filter } from 'lucide-react';
-import type { Anggota, Iuran, Kas, Santunan } from '@/types/database';
+import type { Anggota, IuranTagihan, Kas, Santunan } from '@/types/database';
 import { formatCurrency, formatDate, formatPeriode } from '@/lib/format';
 import { exportToPDF, exportToExcel } from '@/lib/export';
 import { cn } from '@/lib/utils';
 
-interface KKIuranReport {
+interface KKTagihanReport {
   no_kk: string;
   kepala_keluarga: string;
   anggota_list: Anggota[];
-  iuran_list: Iuran[];
-  total_iuran: number;
+  tagihan_list: IuranTagihan[];
+  total_tagihan: number;
   total_lunas: number;
   total_belum_bayar: number;
 }
 
 export default function LaporanPage() {
   const [anggotaList, setAnggotaList] = useState<Anggota[]>([]);
-  const [iuranList, setIuranList] = useState<Iuran[]>([]);
+  const [tagihanList, setTagihanList] = useState<IuranTagihan[]>([]);
   const [kasList, setKasList] = useState<Kas[]>([]);
   const [santunanList, setSantunanList] = useState<Santunan[]>([]);
-  const [kkIuranReport, setKkIuranReport] = useState<KKIuranReport[]>([]);
+  const [kkTagihanReport, setKkTagihanReport] = useState<KKTagihanReport[]>([]);
   const [expandedKK, setExpandedKK] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [selectedPeriode, setSelectedPeriode] = useState<string>('all');
 
-  // Generate available periods from iuran data
+  // Generate available periods from tagihan data
   const availablePeriodes = useMemo(() => {
     const periodes = new Set<string>();
-    iuranList.forEach(i => periodes.add(i.periode));
+    tagihanList.forEach(t => periodes.add(t.periode));
     return Array.from(periodes).sort().reverse();
-  }, [iuranList]);
+  }, [tagihanList]);
 
-  // Filter KK Iuran Report by selected period
-  const filteredKkIuranReport = useMemo(() => {
-    if (selectedPeriode === 'all') return kkIuranReport;
+  // Filter KK Tagihan Report by selected period
+  const filteredKkTagihanReport = useMemo(() => {
+    if (selectedPeriode === 'all') return kkTagihanReport;
     
-    return kkIuranReport.map(kk => {
-      const filteredIuran = kk.iuran_list.filter(i => i.periode === selectedPeriode);
-      const total_iuran = filteredIuran.reduce((sum, i) => sum + i.nominal, 0);
-      const total_lunas = filteredIuran.filter(i => i.status === 'lunas').reduce((sum, i) => sum + i.nominal, 0);
-      const total_belum_bayar = filteredIuran.filter(i => i.status === 'belum_bayar' || i.status === 'ditolak').reduce((sum, i) => sum + i.nominal, 0);
+    return kkTagihanReport.map(kk => {
+      const filteredTagihan = kk.tagihan_list.filter(t => t.periode === selectedPeriode);
+      const total_tagihan = filteredTagihan.reduce((sum, t) => sum + t.nominal, 0);
+      const total_lunas = filteredTagihan.filter(t => t.status === 'lunas').reduce((sum, t) => sum + t.nominal, 0);
+      const total_belum_bayar = filteredTagihan.filter(t => t.status === 'belum_bayar').reduce((sum, t) => sum + t.nominal, 0);
       
       return {
         ...kk,
-        iuran_list: filteredIuran,
-        total_iuran,
+        tagihan_list: filteredTagihan,
+        total_tagihan,
         total_lunas,
         total_belum_bayar,
       };
-    }).filter(kk => kk.iuran_list.length > 0);
-  }, [kkIuranReport, selectedPeriode]);
+    }).filter(kk => kk.tagihan_list.length > 0);
+  }, [kkTagihanReport, selectedPeriode]);
 
   useEffect(() => {
     fetchData();
@@ -69,23 +69,23 @@ export default function LaporanPage() {
 
   const fetchData = async () => {
     try {
-      const [anggotaRes, iuranRes, kasRes, santunanRes] = await Promise.all([
+      const [anggotaRes, tagihanRes, kasRes, santunanRes] = await Promise.all([
         supabase.from('anggota').select('*').order('nama_lengkap'),
-        supabase.from('iuran').select('*, anggota(*)').order('jatuh_tempo', { ascending: false }),
+        supabase.from('iuran_tagihan').select('*').order('jatuh_tempo', { ascending: false }),
         supabase.from('kas').select('*').order('created_at', { ascending: false }),
         supabase.from('santunan').select('*, anggota(*), kematian(*)').order('created_at', { ascending: false }),
       ]);
 
       const anggota = anggotaRes.data as Anggota[] || [];
-      const iuran = iuranRes.data as Iuran[] || [];
+      const tagihan = tagihanRes.data as IuranTagihan[] || [];
 
       setAnggotaList(anggota);
-      setIuranList(iuran);
+      setTagihanList(tagihan);
       setKasList(kasRes.data as Kas[] || []);
       setSantunanList(santunanRes.data as Santunan[] || []);
 
-      // Build KK Iuran Report
-      const kkMap = new Map<string, KKIuranReport>();
+      // Build KK Tagihan Report
+      const kkMap = new Map<string, KKTagihanReport>();
       
       anggota.forEach(a => {
         if (!kkMap.has(a.no_kk)) {
@@ -93,8 +93,8 @@ export default function LaporanPage() {
             no_kk: a.no_kk,
             kepala_keluarga: '',
             anggota_list: [],
-            iuran_list: [],
-            total_iuran: 0,
+            tagihan_list: [],
+            total_tagihan: 0,
             total_lunas: 0,
             total_belum_bayar: 0,
           });
@@ -106,17 +106,16 @@ export default function LaporanPage() {
         }
       });
 
-      // Assign iuran to KK
-      iuran.forEach(i => {
-        const noKK = i.no_kk || i.anggota?.no_kk;
-        if (noKK && kkMap.has(noKK)) {
-          const kk = kkMap.get(noKK)!;
-          kk.iuran_list.push(i);
-          kk.total_iuran += i.nominal;
-          if (i.status === 'lunas') {
-            kk.total_lunas += i.nominal;
-          } else if (i.status === 'belum_bayar' || i.status === 'ditolak') {
-            kk.total_belum_bayar += i.nominal;
+      // Assign tagihan to KK
+      tagihan.forEach(t => {
+        if (kkMap.has(t.no_kk)) {
+          const kk = kkMap.get(t.no_kk)!;
+          kk.tagihan_list.push(t);
+          kk.total_tagihan += t.nominal;
+          if (t.status === 'lunas') {
+            kk.total_lunas += t.nominal;
+          } else if (t.status === 'belum_bayar') {
+            kk.total_belum_bayar += t.nominal;
           }
         }
       });
@@ -128,7 +127,7 @@ export default function LaporanPage() {
         }
       });
 
-      setKkIuranReport(Array.from(kkMap.values()).sort((a, b) => a.kepala_keluarga.localeCompare(b.kepala_keluarga)));
+      setKkTagihanReport(Array.from(kkMap.values()).sort((a, b) => a.kepala_keluarga.localeCompare(b.kepala_keluarga)));
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -149,8 +148,8 @@ export default function LaporanPage() {
   };
 
   const totalAnggotaAktif = anggotaList.filter(a => a.status === 'aktif').length;
-  const totalKK = kkIuranReport.length;
-  const totalIuranLunas = iuranList.filter(i => i.status === 'lunas').length;
+  const totalKK = kkTagihanReport.length;
+  const totalTagihanLunas = tagihanList.filter(t => t.status === 'lunas').length;
   const saldoKas = kasList.reduce((acc, k) => acc + (k.jenis === 'pemasukan' ? k.nominal : -k.nominal), 0);
   const totalSantunanDisalurkan = santunanList.filter(s => s.status === 'disalurkan').reduce((acc, s) => acc + s.nominal_akhir, 0);
 
@@ -164,20 +163,20 @@ export default function LaporanPage() {
     { key: 'tanggal_bergabung', header: 'Bergabung', format: (v: string) => formatDate(v) },
   ];
 
-  const iuranExportColumns = [
-    { key: 'no_kk', header: 'No. KK', format: (_: any, row: Iuran) => row.no_kk || row.anggota?.no_kk || '-' },
-    { key: 'anggota', header: 'Kepala Keluarga', format: (_: any, row: Iuran) => row.anggota?.nama_lengkap || '-' },
+  const tagihanExportColumns = [
+    { key: 'no_kk', header: 'No. KK' },
+    { key: 'kepala', header: 'Kepala Keluarga', format: (_: any, row: IuranTagihan) => row.kepala_keluarga?.nama_lengkap || '-' },
     { key: 'periode', header: 'Periode', format: (v: string) => formatPeriode(v) },
     { key: 'nominal', header: 'Nominal', format: (v: number) => formatCurrency(v) },
     { key: 'status', header: 'Status' },
     { key: 'jatuh_tempo', header: 'Jatuh Tempo', format: (v: string) => formatDate(v) },
   ];
 
-  const kkIuranExportColumns = [
+  const kkTagihanExportColumns = [
     { key: 'no_kk', header: 'No. KK' },
     { key: 'kepala_keluarga', header: 'Kepala Keluarga' },
-    { key: 'anggota_count', header: 'Jml Anggota', format: (_: any, row: KKIuranReport) => row.anggota_list.length.toString() },
-    { key: 'total_iuran', header: 'Total Iuran', format: (v: number) => formatCurrency(v) },
+    { key: 'anggota_count', header: 'Jml Anggota', format: (_: any, row: KKTagihanReport) => row.anggota_list.length.toString() },
+    { key: 'total_tagihan', header: 'Total Tagihan', format: (v: number) => formatCurrency(v) },
     { key: 'total_lunas', header: 'Total Lunas', format: (v: number) => formatCurrency(v) },
     { key: 'total_belum_bayar', header: 'Belum Bayar', format: (v: number) => formatCurrency(v) },
   ];
@@ -215,32 +214,32 @@ export default function LaporanPage() {
     },
   ];
 
-  const iuranColumns = [
+  const tagihanColumns = [
     {
       key: 'no_kk',
       header: 'No. KK',
-      cell: (item: Iuran) => (
+      cell: (item: IuranTagihan) => (
         <div>
-          <p className="font-medium">{item.no_kk || item.anggota?.no_kk || '-'}</p>
-          <p className="text-xs text-muted-foreground">{item.anggota?.nama_lengkap}</p>
+          <p className="font-medium">{item.no_kk}</p>
+          <p className="text-xs text-muted-foreground">{item.kepala_keluarga?.nama_lengkap}</p>
         </div>
       ),
     },
     {
       key: 'periode',
       header: 'Periode',
-      cell: (item: Iuran) => formatPeriode(item.periode),
+      cell: (item: IuranTagihan) => formatPeriode(item.periode),
     },
     {
       key: 'nominal',
       header: 'Nominal',
-      cell: (item: Iuran) => formatCurrency(item.nominal),
+      cell: (item: IuranTagihan) => formatCurrency(item.nominal),
       className: 'hidden md:table-cell',
     },
     {
       key: 'status',
       header: 'Status',
-      cell: (item: Iuran) => <StatusBadge status={item.status} />,
+      cell: (item: IuranTagihan) => <StatusBadge status={item.status} />,
     },
   ];
 
@@ -301,6 +300,14 @@ export default function LaporanPage() {
     );
   }
 
+  // Map tagihan with kepala keluarga for table display
+  const tagihanWithKK = tagihanList.map(t => {
+    const kepala = anggotaList.find(
+      a => a.no_kk === t.no_kk && a.hubungan_kk === 'Kepala Keluarga'
+    ) || anggotaList.find(a => a.no_kk === t.no_kk);
+    return { ...t, kepala_keluarga: kepala };
+  });
+
   return (
     <AdminLayout>
       <PageHeader title="Laporan" description="Lihat dan cetak laporan RUKEM" />
@@ -318,8 +325,8 @@ export default function LaporanPage() {
           iconClassName="bg-primary/10"
         />
         <StatCard
-          title="Iuran Lunas"
-          value={totalIuranLunas}
+          title="Tagihan Lunas"
+          value={totalTagihanLunas}
           icon={Receipt}
           iconClassName="bg-success/10"
         />
@@ -337,24 +344,24 @@ export default function LaporanPage() {
         />
       </div>
 
-      <Tabs defaultValue="iuran-kk" className="mt-6">
+      <Tabs defaultValue="tagihan-kk" className="mt-6">
         <TabsList className="w-full md:w-auto grid grid-cols-5 md:flex">
-          <TabsTrigger value="iuran-kk">Iuran per KK</TabsTrigger>
+          <TabsTrigger value="tagihan-kk">Tagihan per KK</TabsTrigger>
           <TabsTrigger value="anggota">Anggota</TabsTrigger>
-          <TabsTrigger value="iuran">Iuran</TabsTrigger>
+          <TabsTrigger value="tagihan">Tagihan</TabsTrigger>
           <TabsTrigger value="kas">Kas</TabsTrigger>
           <TabsTrigger value="santunan">Santunan</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="iuran-kk" className="mt-4">
+        <TabsContent value="tagihan-kk" className="mt-4">
           <Card>
             <CardHeader className="space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <CardTitle className="text-base">Laporan Iuran per Kartu Keluarga</CardTitle>
+                <CardTitle className="text-base">Laporan Tagihan per Kartu Keluarga</CardTitle>
                 <ExportButtons
-                  onExportPDF={() => exportToPDF(filteredKkIuranReport, kkIuranExportColumns, `Laporan Iuran per KK RUKEM${selectedPeriode !== 'all' ? ` - ${formatPeriode(selectedPeriode)}` : ''}`, 'laporan-iuran-kk')}
-                  onExportExcel={() => exportToExcel(filteredKkIuranReport, kkIuranExportColumns, 'Iuran per KK', 'laporan-iuran-kk')}
-                  disabled={filteredKkIuranReport.length === 0}
+                  onExportPDF={() => exportToPDF(filteredKkTagihanReport, kkTagihanExportColumns, `Laporan Tagihan per KK RUKEM${selectedPeriode !== 'all' ? ` - ${formatPeriode(selectedPeriode)}` : ''}`, 'laporan-tagihan-kk')}
+                  onExportExcel={() => exportToExcel(filteredKkTagihanReport, kkTagihanExportColumns, 'Tagihan per KK', 'laporan-tagihan-kk')}
+                  disabled={filteredKkTagihanReport.length === 0}
                 />
               </div>
               <div className="flex items-center gap-2">
@@ -374,22 +381,22 @@ export default function LaporanPage() {
                 </Select>
                 {selectedPeriode !== 'all' && (
                   <Badge variant="secondary" className="ml-2">
-                    {filteredKkIuranReport.length} KK
+                    {filteredKkTagihanReport.length} KK
                   </Badge>
                 )}
               </div>
             </CardHeader>
             <CardContent>
-              {filteredKkIuranReport.length === 0 ? (
+              {filteredKkTagihanReport.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">
-                  {selectedPeriode === 'all' ? 'Belum ada data iuran' : `Tidak ada data iuran untuk periode ${formatPeriode(selectedPeriode)}`}
+                  {selectedPeriode === 'all' ? 'Belum ada data tagihan' : `Tidak ada data tagihan untuk periode ${formatPeriode(selectedPeriode)}`}
                 </p>
               ) : (
               <div className="space-y-2">
-                {filteredKkIuranReport.map((kk) => {
+                {filteredKkTagihanReport.map((kk) => {
                   const isExpanded = expandedKK.has(kk.no_kk);
-                  const lunasCount = kk.iuran_list.filter(i => i.status === 'lunas').length;
-                  const totalCount = kk.iuran_list.length;
+                  const lunasCount = kk.tagihan_list.filter(t => t.status === 'lunas').length;
+                  const totalCount = kk.tagihan_list.length;
                   
                   return (
                     <div key={kk.no_kk} className="border rounded-lg overflow-hidden">
@@ -454,33 +461,33 @@ export default function LaporanPage() {
                             </div>
                           </div>
 
-                          {/* Iuran History */}
+                          {/* Tagihan History */}
                           <div>
-                            <p className="text-sm font-medium mb-2">Riwayat Iuran:</p>
-                            {kk.iuran_list.length === 0 ? (
-                              <p className="text-sm text-muted-foreground">Belum ada data iuran</p>
+                            <p className="text-sm font-medium mb-2">Riwayat Tagihan:</p>
+                            {kk.tagihan_list.length === 0 ? (
+                              <p className="text-sm text-muted-foreground">Belum ada data tagihan</p>
                             ) : (
                               <div className="space-y-2">
-                                {kk.iuran_list.slice(0, 6).map((iuran) => (
+                                {kk.tagihan_list.slice(0, 6).map((tagihan) => (
                                   <div 
-                                    key={iuran.id} 
+                                    key={tagihan.id} 
                                     className="flex items-center justify-between p-3 rounded-lg border bg-card"
                                   >
                                     <div>
-                                      <p className="font-medium">{formatPeriode(iuran.periode)}</p>
+                                      <p className="font-medium">{formatPeriode(tagihan.periode)}</p>
                                       <p className="text-xs text-muted-foreground">
-                                        Jatuh tempo: {formatDate(iuran.jatuh_tempo)}
+                                        Jatuh tempo: {formatDate(tagihan.jatuh_tempo)}
                                       </p>
                                     </div>
                                     <div className="flex items-center gap-3">
-                                      <p className="font-medium">{formatCurrency(iuran.nominal)}</p>
-                                      <StatusBadge status={iuran.status} />
+                                      <p className="font-medium">{formatCurrency(tagihan.nominal)}</p>
+                                      <StatusBadge status={tagihan.status} />
                                     </div>
                                   </div>
                                 ))}
-                                {kk.iuran_list.length > 6 && (
+                                {kk.tagihan_list.length > 6 && (
                                   <p className="text-sm text-muted-foreground text-center py-2">
-                                    +{kk.iuran_list.length - 6} iuran lainnya
+                                    +{kk.tagihan_list.length - 6} tagihan lainnya
                                   </p>
                                 )}
                               </div>
@@ -490,8 +497,8 @@ export default function LaporanPage() {
                           {/* Summary */}
                           <div className="mt-4 pt-4 border-t grid grid-cols-3 gap-4 text-center">
                             <div>
-                              <p className="text-xs text-muted-foreground">Total Iuran</p>
-                              <p className="font-bold">{formatCurrency(kk.total_iuran)}</p>
+                              <p className="text-xs text-muted-foreground">Total Tagihan</p>
+                              <p className="font-bold">{formatCurrency(kk.total_tagihan)}</p>
                             </div>
                             <div>
                               <p className="text-xs text-muted-foreground">Sudah Dibayar</p>
@@ -529,18 +536,18 @@ export default function LaporanPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="iuran" className="mt-4">
+        <TabsContent value="tagihan" className="mt-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-base">Laporan Iuran</CardTitle>
+              <CardTitle className="text-base">Laporan Tagihan</CardTitle>
               <ExportButtons
-                onExportPDF={() => exportToPDF(iuranList, iuranExportColumns, 'Laporan Data Iuran RUKEM', 'laporan-iuran')}
-                onExportExcel={() => exportToExcel(iuranList, iuranExportColumns, 'Iuran', 'laporan-iuran')}
-                disabled={iuranList.length === 0}
+                onExportPDF={() => exportToPDF(tagihanWithKK, tagihanExportColumns, 'Laporan Data Tagihan RUKEM', 'laporan-tagihan')}
+                onExportExcel={() => exportToExcel(tagihanWithKK, tagihanExportColumns, 'Tagihan', 'laporan-tagihan')}
+                disabled={tagihanList.length === 0}
               />
             </CardHeader>
             <CardContent>
-              <DataTable columns={iuranColumns} data={iuranList} />
+              <DataTable columns={tagihanColumns} data={tagihanWithKK} />
             </CardContent>
           </Card>
         </TabsContent>

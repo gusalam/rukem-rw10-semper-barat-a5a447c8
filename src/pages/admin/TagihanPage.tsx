@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { PageHeader } from '@/components/ui/page-header';
@@ -9,6 +9,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog';
 import { AdminIuranSkeleton } from '@/components/ui/admin-loading-skeleton';
+import { ExportButtons } from '@/components/ui/export-buttons';
 import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
@@ -26,10 +27,11 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Search, RefreshCw, Edit, Trash2, Receipt, FileText } from 'lucide-react';
+import { Plus, Search, RefreshCw, Edit, Trash2, Receipt, Filter } from 'lucide-react';
 import type { IuranTagihan, Anggota, Pengaturan, StatusTagihan } from '@/types/database';
 import { formatCurrency, formatDate, formatPeriode, getCurrentPeriode } from '@/lib/format';
 import { getErrorMessage, StandardMessages } from '@/lib/error-messages';
+import { exportToPDF, exportToExcel } from '@/lib/export';
 
 interface KKData {
   no_kk: string;
@@ -46,6 +48,7 @@ export default function TagihanPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [periodeFilter, setPeriodeFilter] = useState<string>('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [generateDialogOpen, setGenerateDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -319,14 +322,51 @@ export default function TagihanPage() {
     }
   };
 
+  // Available periods for filter
+  const availablePeriodes = useMemo(() => {
+    const periodes = new Set<string>();
+    tagihanList.forEach(t => periodes.add(t.periode));
+    return Array.from(periodes).sort().reverse();
+  }, [tagihanList]);
+
   const filteredTagihan = tagihanList.filter((t) => {
     const matchSearch = 
       t.kepala_keluarga?.nama_lengkap?.toLowerCase().includes(search.toLowerCase()) ||
       t.no_kk?.includes(search) ||
       t.periode.includes(search);
     const matchStatus = statusFilter === 'all' || t.status === statusFilter;
-    return matchSearch && matchStatus;
+    const matchPeriode = periodeFilter === 'all' || t.periode === periodeFilter;
+    return matchSearch && matchStatus && matchPeriode;
   });
+
+  // Export columns
+  const exportColumns = [
+    { key: 'no_kk', header: 'No. KK' },
+    { key: 'kepala_keluarga', header: 'Kepala Keluarga', format: (_: any, row: IuranTagihan) => row.kepala_keluarga?.nama_lengkap || '-' },
+    { key: 'rt', header: 'RT', format: (_: any, row: IuranTagihan) => row.kepala_keluarga?.rt || '-' },
+    { key: 'rw', header: 'RW', format: (_: any, row: IuranTagihan) => row.kepala_keluarga?.rw || '-' },
+    { key: 'periode', header: 'Periode', format: (v: string) => formatPeriode(v) },
+    { key: 'nominal', header: 'Nominal', format: (v: number) => formatCurrency(v) },
+    { key: 'jatuh_tempo', header: 'Jatuh Tempo', format: (v: string) => formatDate(v) },
+    { key: 'status', header: 'Status', format: (v: string) => v === 'lunas' ? 'Lunas' : v === 'menunggu_admin' ? 'Menunggu Admin' : 'Belum Bayar' },
+  ];
+
+  const handleExportPDF = () => {
+    const title = periodeFilter !== 'all' 
+      ? `Laporan Tagihan RUKEM - ${formatPeriode(periodeFilter)}`
+      : 'Laporan Tagihan RUKEM - Semua Periode';
+    const filename = periodeFilter !== 'all'
+      ? `tagihan-${periodeFilter}`
+      : 'tagihan-semua-periode';
+    exportToPDF(filteredTagihan, exportColumns, title, filename);
+  };
+
+  const handleExportExcel = () => {
+    const filename = periodeFilter !== 'all'
+      ? `tagihan-${periodeFilter}`
+      : 'tagihan-semua-periode';
+    exportToExcel(filteredTagihan, exportColumns, 'Tagihan', filename);
+  };
 
   const columns = [
     {
@@ -559,12 +599,24 @@ export default function TagihanPage() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Cari nama, no KK, periode..."
+              placeholder="Cari nama, no KK..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9"
             />
           </div>
+          <Select value={periodeFilter} onValueChange={setPeriodeFilter}>
+            <SelectTrigger className="w-full sm:w-[180px]">
+              <Filter className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="Periode" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Semua Periode</SelectItem>
+              {availablePeriodes.map((p) => (
+                <SelectItem key={p} value={p}>{formatPeriode(p)}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-full sm:w-[180px]">
               <SelectValue placeholder="Filter Status" />
@@ -576,6 +628,11 @@ export default function TagihanPage() {
               <SelectItem value="lunas">Lunas</SelectItem>
             </SelectContent>
           </Select>
+          <ExportButtons
+            onExportPDF={handleExportPDF}
+            onExportExcel={handleExportExcel}
+            disabled={filteredTagihan.length === 0}
+          />
         </div>
 
         {filteredTagihan.length === 0 ? (
