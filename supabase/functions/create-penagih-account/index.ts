@@ -130,6 +130,28 @@ serve(async (req) => {
       // Continue anyway - profile trigger might have created it
     }
 
+    // Add penagih record
+    const { error: penagihError } = await supabaseAdmin
+      .from('penagih')
+      .insert({
+        user_id: newUser.user.id,
+        nama_lengkap: nama_lengkap,
+        email: email,
+        status_aktif: true,
+      });
+
+    if (penagihError) {
+      console.error('Insert penagih error:', penagihError);
+      // Rollback
+      await supabaseAdmin.from('user_roles').delete().eq('user_id', newUser.user.id);
+      await supabaseAdmin.from('profiles').delete().eq('user_id', newUser.user.id);
+      await supabaseAdmin.auth.admin.deleteUser(newUser.user.id);
+      return new Response(JSON.stringify({ error: 'Gagal menambahkan data penagih: ' + penagihError.message }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // Add wilayah
     const { error: wilayahError } = await supabaseAdmin
       .from('penagih_wilayah')
@@ -142,6 +164,7 @@ serve(async (req) => {
     if (wilayahError) {
       console.error('Insert wilayah error:', wilayahError);
       // Rollback
+      await supabaseAdmin.from('penagih').delete().eq('user_id', newUser.user.id);
       await supabaseAdmin.from('user_roles').delete().eq('user_id', newUser.user.id);
       await supabaseAdmin.from('profiles').delete().eq('user_id', newUser.user.id);
       await supabaseAdmin.auth.admin.deleteUser(newUser.user.id);
