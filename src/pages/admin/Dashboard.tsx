@@ -9,15 +9,15 @@ import { DataTable } from '@/components/ui/data-table';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Badge } from '@/components/ui/badge';
 import { AdminDashboardSkeleton } from '@/components/ui/admin-loading-skeleton';
-import { formatCurrency, formatDate } from '@/lib/format';
-import { Users, Receipt, Wallet, AlertCircle, TrendingUp, Clock, RefreshCw, Home } from 'lucide-react';
-import type { Iuran, PembayaranIuran } from '@/types/database';
+import { formatCurrency, formatDate, formatPeriode } from '@/lib/format';
+import { Users, Receipt, Wallet, Clock, RefreshCw, Home, TrendingUp } from 'lucide-react';
+import type { IuranTagihan, IuranPembayaran } from '@/types/database';
 
 interface DashboardStats {
   totalAnggota: number;
   totalKK: number;
   anggotaAktif: number;
-  totalIuranBulanIni: number;
+  totalTagihanBulanIni: number;
   totalLunas: number;
   saldoKas: number;
   pendingVerifikasi: number;
@@ -28,13 +28,13 @@ export default function AdminDashboard() {
     totalAnggota: 0,
     totalKK: 0,
     anggotaAktif: 0,
-    totalIuranBulanIni: 0,
+    totalTagihanBulanIni: 0,
     totalLunas: 0,
     saldoKas: 0,
     pendingVerifikasi: 0,
   });
-  const [pendingPayments, setPendingPayments] = useState<PembayaranIuran[]>([]);
-  const [recentIuran, setRecentIuran] = useState<Iuran[]>([]);
+  const [pendingPayments, setPendingPayments] = useState<IuranPembayaran[]>([]);
+  const [recentTagihan, setRecentTagihan] = useState<IuranTagihan[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [isLive, setIsLive] = useState(false);
@@ -52,16 +52,15 @@ export default function AdminDashboard() {
       const uniqueKK = new Set(anggotaData?.map(a => a.no_kk) || []);
       const totalKK = uniqueKK.size;
 
-      // Fetch current month iuran (now per KK)
+      // Fetch current month tagihan (per KK)
       const currentMonth = new Date().toISOString().slice(0, 7);
-      const { data: iuranData } = await supabase
-        .from('iuran')
+      const { data: tagihanData } = await supabase
+        .from('iuran_tagihan')
         .select('*')
         .like('periode', `${currentMonth}%`);
 
-      // Count unique KK iuran
-      const totalIuranBulanIni = iuranData?.length || 0;
-      const totalLunas = iuranData?.filter(i => i.status === 'lunas').length || 0;
+      const totalTagihanBulanIni = tagihanData?.length || 0;
+      const totalLunas = tagihanData?.filter(t => t.status === 'lunas').length || 0;
 
       // Fetch kas balance
       const { data: kasData } = await supabase.from('kas').select('jenis, nominal');
@@ -69,19 +68,18 @@ export default function AdminDashboard() {
         return acc + (k.jenis === 'pemasukan' ? k.nominal : -k.nominal);
       }, 0) || 0;
 
-      // Fetch pending verifications
+      // Fetch pending verifications from iuran_pembayaran
       const { data: pendingData, count: pendingCount } = await supabase
-        .from('pembayaran_iuran')
-        .select('*, iuran(*), anggota(*)', { count: 'exact' })
-        .is('verified_at', null)
-        .is('alasan_tolak', null)
+        .from('iuran_pembayaran')
+        .select('*, tagihan:iuran_tagihan(*)', { count: 'exact' })
+        .eq('status', 'menunggu_admin')
         .order('created_at', { ascending: false })
         .limit(5);
 
-      // Fetch recent iuran
+      // Fetch recent tagihan
       const { data: recentData } = await supabase
-        .from('iuran')
-        .select('*, anggota(*)')
+        .from('iuran_tagihan')
+        .select('*')
         .order('created_at', { ascending: false })
         .limit(5);
 
@@ -89,13 +87,13 @@ export default function AdminDashboard() {
         totalAnggota: totalAnggota || 0,
         totalKK,
         anggotaAktif,
-        totalIuranBulanIni,
+        totalTagihanBulanIni,
         totalLunas,
         saldoKas,
         pendingVerifikasi: pendingCount || 0,
       });
-      setPendingPayments(pendingData as PembayaranIuran[] || []);
-      setRecentIuran(recentData as Iuran[] || []);
+      setPendingPayments(pendingData as IuranPembayaran[] || []);
+      setRecentTagihan(recentData as IuranTagihan[] || []);
       setLastUpdate(new Date());
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -111,7 +109,7 @@ export default function AdminDashboard() {
 
   // Realtime subscriptions - auto refresh when any of these tables change
   useMultiRealtime(
-    ['pembayaran_iuran', 'iuran', 'kas', 'anggota'],
+    ['iuran_pembayaran', 'iuran_tagihan', 'kas', 'anggota'],
     useCallback(() => {
       console.log('[Dashboard] Realtime update detected, refreshing...');
       setIsLive(true);
@@ -123,36 +121,36 @@ export default function AdminDashboard() {
 
   const paymentColumns = [
     {
-      key: 'anggota',
-      header: 'Anggota',
-      cell: (item: PembayaranIuran) => item.anggota?.nama_lengkap || '-',
+      key: 'tagihan',
+      header: 'KK',
+      cell: (item: IuranPembayaran) => item.tagihan?.no_kk || '-',
     },
     {
       key: 'nominal',
       header: 'Nominal',
-      cell: (item: PembayaranIuran) => formatCurrency(item.nominal),
+      cell: (item: IuranPembayaran) => formatCurrency(item.nominal),
     },
     {
       key: 'tanggal_bayar',
       header: 'Tanggal',
-      cell: (item: PembayaranIuran) => formatDate(item.tanggal_bayar),
+      cell: (item: IuranPembayaran) => formatDate(item.tanggal_bayar),
     },
   ];
 
-  const iuranColumns = [
+  const tagihanColumns = [
     {
-      key: 'anggota',
-      header: 'Anggota',
-      cell: (item: Iuran) => item.anggota?.nama_lengkap || '-',
+      key: 'no_kk',
+      header: 'No. KK',
     },
     {
       key: 'periode',
       header: 'Periode',
+      cell: (item: IuranTagihan) => formatPeriode(item.periode),
     },
     {
       key: 'status',
       header: 'Status',
-      cell: (item: Iuran) => <StatusBadge status={item.status} />,
+      cell: (item: IuranTagihan) => <StatusBadge status={item.status} />,
     },
   ];
 
@@ -200,8 +198,8 @@ export default function AdminDashboard() {
           iconClassName="bg-primary/10"
         />
         <StatCard
-          title="Iuran Bulan Ini"
-          value={`${stats.totalLunas}/${stats.totalIuranBulanIni}`}
+          title="Tagihan Bulan Ini"
+          value={`${stats.totalLunas}/${stats.totalTagihanBulanIni}`}
           icon={Receipt}
           description="KK lunas dari total tagihan"
           iconClassName="bg-info/10"
@@ -227,7 +225,7 @@ export default function AdminDashboard() {
             <CardTitle className="text-base font-semibold">
               Pembayaran Menunggu Verifikasi
             </CardTitle>
-            <AlertCircle className="h-4 w-4 text-warning" />
+            <Clock className="h-4 w-4 text-warning" />
           </CardHeader>
           <CardContent>
             <DataTable
@@ -241,15 +239,15 @@ export default function AdminDashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-base font-semibold">
-              Iuran Terbaru
+              Tagihan Terbaru
             </CardTitle>
             <TrendingUp className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
             <DataTable
-              columns={iuranColumns}
-              data={recentIuran}
-              emptyMessage="Belum ada data iuran"
+              columns={tagihanColumns}
+              data={recentTagihan}
+              emptyMessage="Belum ada data tagihan"
             />
           </CardContent>
         </Card>
