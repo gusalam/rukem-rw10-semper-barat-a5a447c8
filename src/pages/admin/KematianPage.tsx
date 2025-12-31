@@ -27,7 +27,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog';
 import { Plus, Skull, AlertTriangle, Trash2 } from 'lucide-react';
-import type { Kematian, Anggota, Iuran, Pengaturan } from '@/types/database';
+import type { Kematian, Anggota, IuranTagihan, Pengaturan } from '@/types/database';
 import { formatCurrency, formatDate } from '@/lib/format';
 
 export default function KematianPage() {
@@ -47,7 +47,7 @@ export default function KematianPage() {
   });
   const [selectedAnggotaInfo, setSelectedAnggotaInfo] = useState<{
     tunggakan: number;
-    iuranBelumBayar: Iuran[];
+    tagihanBelumBayar: IuranTagihan[];
   } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
@@ -77,17 +77,21 @@ export default function KematianPage() {
   const handleAnggotaChange = async (anggotaId: string) => {
     setFormData({ ...formData, anggota_id: anggotaId });
     
-    // Fetch tunggakan info
-    const { data: iuranData } = await supabase
-      .from('iuran')
-      .select('*')
-      .eq('anggota_id', anggotaId)
-      .in('status', ['belum_bayar', 'ditolak']);
+    // Get anggota's no_kk to find tagihan
+    const anggota = anggotaList.find(a => a.id === anggotaId);
+    if (!anggota) return;
 
-    const tunggakan = iuranData?.reduce((sum, i) => sum + i.nominal, 0) || 0;
+    // Fetch tunggakan info from iuran_tagihan based on no_kk
+    const { data: tagihanData } = await supabase
+      .from('iuran_tagihan')
+      .select('*')
+      .eq('no_kk', anggota.no_kk)
+      .in('status', ['belum_bayar', 'menunggu_admin']);
+
+    const tunggakan = tagihanData?.reduce((sum, t) => sum + t.nominal, 0) || 0;
     setSelectedAnggotaInfo({
       tunggakan,
-      iuranBelumBayar: iuranData as Iuran[] || [],
+      tagihanBelumBayar: tagihanData as IuranTagihan[] || [],
     });
   };
 
