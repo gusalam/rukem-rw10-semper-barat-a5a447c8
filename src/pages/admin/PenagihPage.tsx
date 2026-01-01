@@ -18,9 +18,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, Search, Users, MapPin, Trash2, Edit, UserCheck, Eye, EyeOff, Power } from 'lucide-react';
+import { Plus, Search, Users, MapPin, Trash2, Edit, UserCheck, Eye, EyeOff } from 'lucide-react';
 import type { PenagihWilayah } from '@/types/database';
 import { getErrorMessage, StandardMessages } from '@/lib/error-messages';
 
@@ -37,6 +44,11 @@ interface PenagihWithWilayah extends PenagihData {
   wilayah: PenagihWilayah[];
 }
 
+interface WilayahOption {
+  rt: string;
+  rw: string;
+}
+
 export default function PenagihPage() {
   const [penagihList, setPenagihList] = useState<PenagihWithWilayah[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,6 +59,12 @@ export default function PenagihPage() {
   const [selectedPenagih, setSelectedPenagih] = useState<PenagihWithWilayah | null>(null);
   const [selectedWilayah, setSelectedWilayah] = useState<PenagihWilayah | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  
+  // Available RT/RW options from anggota data
+  const [availableRT, setAvailableRT] = useState<string[]>([]);
+  const [availableRW, setAvailableRW] = useState<string[]>([]);
+  const [wilayahOptions, setWilayahOptions] = useState<WilayahOption[]>([]);
+  
   const [formData, setFormData] = useState({
     nama_lengkap: '',
     email: '',
@@ -63,7 +81,52 @@ export default function PenagihPage() {
 
   useEffect(() => {
     fetchData();
+    fetchWilayahOptions();
   }, []);
+
+  const fetchWilayahOptions = async () => {
+    try {
+      // Get distinct RT/RW from anggota table
+      const { data, error } = await supabase
+        .from('anggota')
+        .select('rt, rw')
+        .not('rt', 'is', null)
+        .not('rw', 'is', null);
+
+      if (error) {
+        console.error('Error fetching wilayah options:', error);
+        return;
+      }
+
+      if (data) {
+        // Get unique RT values
+        const uniqueRT = [...new Set(data.map(d => d.rt).filter(Boolean))].sort();
+        // Get unique RW values
+        const uniqueRW = [...new Set(data.map(d => d.rw).filter(Boolean))].sort();
+        // Get unique RT/RW combinations
+        const uniqueWilayah: WilayahOption[] = [];
+        const seen = new Set<string>();
+        data.forEach(d => {
+          if (d.rt && d.rw) {
+            const key = `${d.rt}-${d.rw}`;
+            if (!seen.has(key)) {
+              seen.add(key);
+              uniqueWilayah.push({ rt: d.rt, rw: d.rw });
+            }
+          }
+        });
+
+        setAvailableRT(uniqueRT);
+        setAvailableRW(uniqueRW);
+        setWilayahOptions(uniqueWilayah.sort((a, b) => {
+          if (a.rw !== b.rw) return a.rw.localeCompare(b.rw);
+          return a.rt.localeCompare(b.rt);
+        }));
+      }
+    } catch (error) {
+      console.error('Error fetching wilayah:', error);
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -75,7 +138,6 @@ export default function PenagihPage() {
 
       if (penagihError) {
         console.error('Error fetching penagih:', penagihError);
-        // Fallback to old method if table doesn't exist
         await fetchDataLegacy();
         return;
       }
@@ -185,23 +247,112 @@ export default function PenagihPage() {
     }
   };
 
+  // Validate email format
+  const isValidEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  // Get user-friendly error message
+  const getSpecificErrorMessage = (error: any): string => {
+    const message = error?.message?.toLowerCase() || '';
+    
+    if (message.includes('email') && message.includes('already')) {
+      return 'Email sudah digunakan oleh akun lain. Gunakan email yang berbeda.';
+    }
+    if (message.includes('duplicate') && message.includes('email')) {
+      return 'Email sudah terdaftar. Silakan gunakan email lain.';
+    }
+    if (message.includes('password') && message.includes('weak')) {
+      return 'Password terlalu lemah. Gunakan kombinasi huruf dan angka.';
+    }
+    if (message.includes('invalid') && message.includes('email')) {
+      return 'Format email tidak valid. Periksa kembali alamat email.';
+    }
+    if (message.includes('network') || message.includes('fetch')) {
+      return 'Koneksi bermasalah. Periksa koneksi internet Anda.';
+    }
+    if (message.includes('unauthorized') || message.includes('forbidden')) {
+      return 'Anda tidak memiliki izin untuk membuat akun penagih.';
+    }
+    
+    return error?.message || 'Terjadi kesalahan saat membuat akun. Silakan coba lagi.';
+  };
+
   const handleAddPenagih = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.nama_lengkap || !formData.email || !formData.password || !formData.rt || !formData.rw) {
+    // Validation with specific error messages
+    if (!formData.nama_lengkap.trim()) {
       toast({
         variant: 'destructive',
-        title: 'Data Belum Lengkap',
-        description: 'Semua field wajib diisi.',
+        title: 'Nama Belum Diisi',
+        description: 'Masukkan nama lengkap penagih.',
       });
       return;
     }
 
-    if (formData.password.length < 6) {
+    if (!formData.email.trim()) {
+      toast({
+        variant: 'destructive',
+        title: 'Email Belum Diisi',
+        description: 'Masukkan alamat email untuk akun penagih.',
+      });
+      return;
+    }
+
+    if (!isValidEmail(formData.email)) {
+      toast({
+        variant: 'destructive',
+        title: 'Format Email Tidak Valid',
+        description: 'Masukkan alamat email yang benar (contoh: penagih@email.com).',
+      });
+      return;
+    }
+
+    if (!formData.password) {
+      toast({
+        variant: 'destructive',
+        title: 'Password Belum Diisi',
+        description: 'Masukkan password untuk akun penagih.',
+      });
+      return;
+    }
+
+    if (formData.password.length < 8) {
       toast({
         variant: 'destructive',
         title: 'Password Terlalu Pendek',
-        description: 'Password minimal 6 karakter.',
+        description: 'Password minimal 8 karakter.',
+      });
+      return;
+    }
+
+    if (!formData.rt) {
+      toast({
+        variant: 'destructive',
+        title: 'Wilayah RT Belum Dipilih',
+        description: 'Pilih RT dari dropdown yang tersedia.',
+      });
+      return;
+    }
+
+    if (!formData.rw) {
+      toast({
+        variant: 'destructive',
+        title: 'Wilayah RW Belum Dipilih',
+        description: 'Pilih RW dari dropdown yang tersedia.',
+      });
+      return;
+    }
+
+    // Check if RT/RW combination exists in anggota data
+    const wilayahExists = wilayahOptions.some(w => w.rt === formData.rt && w.rw === formData.rw);
+    if (!wilayahExists) {
+      toast({
+        variant: 'destructive',
+        title: 'Wilayah Tidak Valid',
+        description: `Kombinasi RT ${formData.rt} / RW ${formData.rw} tidak ditemukan dalam data anggota. Pastikan ada anggota yang terdaftar di wilayah tersebut.`,
       });
       return;
     }
@@ -217,25 +368,25 @@ export default function PenagihPage() {
 
       const response = await supabase.functions.invoke('create-penagih-account', {
         body: {
-          email: formData.email,
+          email: formData.email.trim().toLowerCase(),
           password: formData.password,
-          nama_lengkap: formData.nama_lengkap,
+          nama_lengkap: formData.nama_lengkap.trim(),
           rt: formData.rt,
           rw: formData.rw,
         },
       });
 
       if (response.error) {
-        throw new Error(response.error.message || 'Gagal membuat akun penagih');
+        throw new Error(getSpecificErrorMessage(response.error));
       }
 
       if (response.data?.error) {
-        throw new Error(response.data.error);
+        throw new Error(getSpecificErrorMessage({ message: response.data.error }));
       }
 
       toast({
         title: '✓ Penagih Berhasil Dibuat',
-        description: `Akun penagih ${formData.nama_lengkap} berhasil dibuat.`,
+        description: `Akun penagih ${formData.nama_lengkap} untuk wilayah RT ${formData.rt}/RW ${formData.rw} berhasil dibuat.`,
       });
       setDialogOpen(false);
       resetForm();
@@ -243,8 +394,8 @@ export default function PenagihPage() {
     } catch (error: any) {
       toast({
         variant: 'destructive',
-        title: 'Gagal Membuat Akun',
-        description: getErrorMessage(error, StandardMessages.error.save),
+        title: 'Gagal Membuat Akun Penagih',
+        description: getSpecificErrorMessage(error),
       });
     } finally {
       setSubmitting(false);
@@ -254,11 +405,42 @@ export default function PenagihPage() {
   const handleSaveWilayah = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!selectedPenagih || !wilayahFormData.rt || !wilayahFormData.rw) {
+    if (!selectedPenagih) {
       toast({
         variant: 'destructive',
-        title: 'Data Belum Lengkap',
-        description: StandardMessages.validation.required,
+        title: 'Kesalahan',
+        description: 'Penagih tidak dipilih.',
+      });
+      return;
+    }
+
+    if (!wilayahFormData.rt) {
+      toast({
+        variant: 'destructive',
+        title: 'Wilayah RT Belum Dipilih',
+        description: 'Pilih RT dari dropdown yang tersedia.',
+      });
+      return;
+    }
+
+    if (!wilayahFormData.rw) {
+      toast({
+        variant: 'destructive',
+        title: 'Wilayah RW Belum Dipilih',
+        description: 'Pilih RW dari dropdown yang tersedia.',
+      });
+      return;
+    }
+
+    // Check if this wilayah is already assigned to this penagih
+    const alreadyAssigned = selectedPenagih.wilayah.some(
+      w => w.rt === wilayahFormData.rt && w.rw === wilayahFormData.rw && w.id !== selectedWilayah?.id
+    );
+    if (alreadyAssigned) {
+      toast({
+        variant: 'destructive',
+        title: 'Wilayah Sudah Ditambahkan',
+        description: `Penagih ini sudah memiliki wilayah RT ${wilayahFormData.rt}/RW ${wilayahFormData.rw}.`,
       });
       return;
     }
@@ -275,7 +457,10 @@ export default function PenagihPage() {
           .eq('id', selectedWilayah.id);
 
         if (error) throw error;
-        toast({ title: '✓ Wilayah Diperbarui', description: 'Data wilayah berhasil diperbarui.' });
+        toast({ 
+          title: '✓ Wilayah Diperbarui', 
+          description: `Wilayah berhasil diubah menjadi RT ${wilayahFormData.rt}/RW ${wilayahFormData.rw}.` 
+        });
       } else {
         const { error } = await supabase
           .from('penagih_wilayah')
@@ -286,7 +471,10 @@ export default function PenagihPage() {
           });
 
         if (error) throw error;
-        toast({ title: '✓ Wilayah Ditambahkan', description: 'Wilayah baru berhasil ditambahkan.' });
+        toast({ 
+          title: '✓ Wilayah Ditambahkan', 
+          description: `Wilayah RT ${wilayahFormData.rt}/RW ${wilayahFormData.rw} berhasil ditambahkan.` 
+        });
       }
 
       setWilayahDialogOpen(false);
@@ -294,7 +482,7 @@ export default function PenagihPage() {
     } catch (error: any) {
       toast({
         variant: 'destructive',
-        title: 'Gagal Menyimpan',
+        title: 'Gagal Menyimpan Wilayah',
         description: getErrorMessage(error, StandardMessages.error.save),
       });
     } finally {
@@ -314,13 +502,16 @@ export default function PenagihPage() {
 
       if (error) throw error;
 
-      toast({ title: '✓ Wilayah Dihapus', description: 'Wilayah berhasil dihapus.' });
+      toast({ 
+        title: '✓ Wilayah Dihapus', 
+        description: `Wilayah RT ${selectedWilayah.rt}/RW ${selectedWilayah.rw} berhasil dihapus.` 
+      });
       setDeleteDialogOpen(false);
       fetchData();
     } catch (error: any) {
       toast({
         variant: 'destructive',
-        title: 'Gagal Menghapus',
+        title: 'Gagal Menghapus Wilayah',
         description: getErrorMessage(error, StandardMessages.error.delete),
       });
     } finally {
@@ -333,6 +524,24 @@ export default function PenagihPage() {
     p.email?.toLowerCase().includes(search.toLowerCase()) ||
     p.wilayah.some(w => w.rt.includes(search) || w.rw.includes(search))
   );
+
+  // Filter RW options based on selected RT (for form)
+  const getFilteredRW = (selectedRT: string) => {
+    if (!selectedRT) return availableRW;
+    const rwForRT = wilayahOptions
+      .filter(w => w.rt === selectedRT)
+      .map(w => w.rw);
+    return [...new Set(rwForRT)].sort();
+  };
+
+  // Filter RT options based on selected RW (for form)
+  const getFilteredRT = (selectedRW: string) => {
+    if (!selectedRW) return availableRT;
+    const rtForRW = wilayahOptions
+      .filter(w => w.rw === selectedRW)
+      .map(w => w.rt);
+    return [...new Set(rtForRW)].sort();
+  };
 
   const columns = [
     {
@@ -452,7 +661,7 @@ export default function PenagihPage() {
                     type={showPassword ? 'text' : 'password'}
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    placeholder="Minimal 6 karakter"
+                    placeholder="Minimal 8 karakter"
                     className="pr-10"
                   />
                   <Button
@@ -465,36 +674,73 @@ export default function PenagihPage() {
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </Button>
                 </div>
+                <p className="text-xs text-muted-foreground">Minimal 8 karakter</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label>RT <span className="text-destructive">*</span></Label>
-                  <Input
+                  <Select
                     value={formData.rt}
-                    onChange={(e) => setFormData({ ...formData, rt: e.target.value })}
-                    placeholder="001"
-                  />
+                    onValueChange={(value) => setFormData({ ...formData, rt: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih RT" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(formData.rw ? getFilteredRT(formData.rw) : availableRT).map((rt) => (
+                        <SelectItem key={rt} value={rt}>
+                          RT {rt}
+                        </SelectItem>
+                      ))}
+                      {availableRT.length === 0 && (
+                        <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                          Tidak ada data RT
+                        </div>
+                      )}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-1.5">
                   <Label>RW <span className="text-destructive">*</span></Label>
-                  <Input
+                  <Select
                     value={formData.rw}
-                    onChange={(e) => setFormData({ ...formData, rw: e.target.value })}
-                    placeholder="001"
-                  />
+                    onValueChange={(value) => setFormData({ ...formData, rw: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih RW" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(formData.rt ? getFilteredRW(formData.rt) : availableRW).map((rw) => (
+                        <SelectItem key={rw} value={rw}>
+                          RW {rw}
+                        </SelectItem>
+                      ))}
+                      {availableRW.length === 0 && (
+                        <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                          Tidak ada data RW
+                        </div>
+                      )}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
+              {availableRT.length === 0 && (
+                <p className="text-xs text-destructive bg-destructive/10 p-2 rounded">
+                  Belum ada data anggota dengan RT/RW. Tambahkan anggota terlebih dahulu.
+                </p>
+              )}
+
               <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
-                Akun penagih akan otomatis dibuat dengan role "Penagih" dan dapat langsung login menggunakan email dan password di atas.
+                Akun penagih akan dibuat dengan role "Penagih" dan dapat langsung login. Penagih hanya dapat melihat data KK dan tagihan di wilayah RT/RW yang ditentukan.
               </p>
 
               <div className="flex gap-2 justify-end">
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                   Batal
                 </Button>
-                <Button type="submit" disabled={submitting}>
+                <Button type="submit" disabled={submitting || availableRT.length === 0}>
                   {submitting ? 'Membuat Akun...' : 'Buat Akun Penagih'}
                 </Button>
               </div>
@@ -617,21 +863,45 @@ export default function PenagihPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>RT <span className="text-destructive">*</span></Label>
-                <Input
+                <Select
                   value={wilayahFormData.rt}
-                  onChange={(e) => setWilayahFormData({ ...wilayahFormData, rt: e.target.value })}
-                  placeholder="001"
-                />
+                  onValueChange={(value) => setWilayahFormData({ ...wilayahFormData, rt: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih RT" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(wilayahFormData.rw ? getFilteredRT(wilayahFormData.rw) : availableRT).map((rt) => (
+                      <SelectItem key={rt} value={rt}>
+                        RT {rt}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-1.5">
                 <Label>RW <span className="text-destructive">*</span></Label>
-                <Input
+                <Select
                   value={wilayahFormData.rw}
-                  onChange={(e) => setWilayahFormData({ ...wilayahFormData, rw: e.target.value })}
-                  placeholder="001"
-                />
+                  onValueChange={(value) => setWilayahFormData({ ...wilayahFormData, rw: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih RW" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(wilayahFormData.rt ? getFilteredRW(wilayahFormData.rt) : availableRW).map((rw) => (
+                      <SelectItem key={rw} value={rw}>
+                        RW {rw}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
+
+            <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
+              Perubahan wilayah langsung mempengaruhi data KK dan tagihan yang dapat diakses penagih ini.
+            </p>
 
             <div className="flex gap-2 justify-end">
               <Button type="button" variant="outline" onClick={() => setWilayahDialogOpen(false)}>
@@ -651,7 +921,7 @@ export default function PenagihPage() {
         onOpenChange={setDeleteDialogOpen}
         onConfirm={handleDeleteWilayah}
         title="Hapus Wilayah"
-        description={`Apakah Anda yakin ingin menghapus wilayah RT ${selectedWilayah?.rt}/RW ${selectedWilayah?.rw}?`}
+        description={`Apakah Anda yakin ingin menghapus wilayah RT ${selectedWilayah?.rt}/RW ${selectedWilayah?.rw}? Penagih tidak akan bisa mengakses data di wilayah ini.`}
         loading={submitting}
       />
     </AdminLayout>
