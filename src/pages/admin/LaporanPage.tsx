@@ -349,14 +349,16 @@ export default function LaporanPage() {
       </div>
 
       <Tabs defaultValue="rekap" className="mt-6">
-        <TabsList className="w-full md:w-auto grid grid-cols-6 md:flex">
-          <TabsTrigger value="rekap">Rekap Bulanan</TabsTrigger>
-          <TabsTrigger value="tagihan-kk">Tagihan per KK</TabsTrigger>
-          <TabsTrigger value="anggota">Anggota</TabsTrigger>
-          <TabsTrigger value="tagihan">Tagihan</TabsTrigger>
-          <TabsTrigger value="kas">Kas</TabsTrigger>
-          <TabsTrigger value="santunan">Santunan</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+          <TabsList className="inline-flex w-max md:w-auto gap-1">
+            <TabsTrigger value="rekap" className="text-xs sm:text-sm whitespace-nowrap">Rekap</TabsTrigger>
+            <TabsTrigger value="tagihan-kk" className="text-xs sm:text-sm whitespace-nowrap">Per KK</TabsTrigger>
+            <TabsTrigger value="anggota" className="text-xs sm:text-sm whitespace-nowrap">Anggota</TabsTrigger>
+            <TabsTrigger value="tagihan" className="text-xs sm:text-sm whitespace-nowrap">Tagihan</TabsTrigger>
+            <TabsTrigger value="kas" className="text-xs sm:text-sm whitespace-nowrap">Kas</TabsTrigger>
+            <TabsTrigger value="santunan" className="text-xs sm:text-sm whitespace-nowrap">Santunan</TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="rekap" className="mt-4">
           <RekapBulanan 
