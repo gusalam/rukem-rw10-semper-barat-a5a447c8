@@ -539,7 +539,9 @@ export default function PenagihPage() {
       });
 
       if (response.error) {
-        throw new Error(response.error.message || 'Gagal menghapus penagih');
+        // Handle specific error messages from edge function
+        const errorMsg = response.error.message || 'Gagal menghapus penagih';
+        throw new Error(errorMsg);
       }
 
       if (response.data?.error) {
@@ -547,17 +549,22 @@ export default function PenagihPage() {
       }
 
       toast({ 
-        title: '✓ Penagih Dihapus', 
-        description: `Akun ${penagihToDelete.nama_lengkap} berhasil dihapus. Data transaksi tetap tersimpan.` 
+        title: '✓ Akun Penagih Berhasil Dihapus', 
+        description: response.data?.message || `Akun ${penagihToDelete.nama_lengkap} telah dihapus permanen dan tidak dapat login kembali.` 
       });
       setDeletePenagihDialogOpen(false);
       setPenagihToDelete(null);
-      fetchData();
+      
+      // Refresh data immediately to remove deleted penagih from list
+      await fetchData();
     } catch (error: any) {
+      // Show specific error message from backend
+      const errorMessage = error.message || 'Terjadi kesalahan saat menghapus penagih';
+      
       toast({
         variant: 'destructive',
         title: 'Gagal Menghapus Penagih',
-        description: error.message || 'Terjadi kesalahan saat menghapus penagih',
+        description: errorMessage,
       });
     } finally {
       setSubmitting(false);
@@ -984,8 +991,8 @@ export default function PenagihPage() {
         open={deletePenagihDialogOpen}
         onOpenChange={setDeletePenagihDialogOpen}
         onConfirm={handleDeletePenagih}
-        title="Hapus Akun Penagih"
-        description={`Apakah Anda yakin ingin menghapus akun penagih "${penagihToDelete?.nama_lengkap}"? Akun akan dinonaktifkan dan tidak bisa login lagi. Data transaksi pembayaran tetap tersimpan.`}
+        title="Hapus Akun Penagih Permanen"
+        description={`Akun penagih "${penagihToDelete?.nama_lengkap}" akan dihapus PERMANEN dan tidak dapat login kembali. Data transaksi pembayaran yang pernah diinput tetap tersimpan untuk keperluan audit dan laporan. Lanjutkan?`}
         loading={submitting}
       />
     </AdminLayout>
