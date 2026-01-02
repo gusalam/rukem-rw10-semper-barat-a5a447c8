@@ -21,9 +21,13 @@ import AnggotaNotifikasiPage from "./pages/anggota/NotifikasiPage";
 import AnggotaIuranPage from "./pages/anggota/IuranPage";
 import AnggotaRiwayatPage from "./pages/anggota/RiwayatPage";
 import AnggotaProfilPage from "./pages/anggota/ProfilPage";
-import PenagihDashboard from "./pages/penagih/Dashboard";
+import RingkasanPage from "./pages/penagih/RingkasanPage";
 import PenagihAnggotaPage from "./pages/penagih/AnggotaPage";
 import PenagihTagihanPage from "./pages/penagih/TagihanPage";
+import RiwayatTagihanPage from "./pages/penagih/RiwayatTagihanPage";
+import InputPembayaranPage from "./pages/penagih/InputPembayaranPage";
+import RekapUangPage from "./pages/penagih/RekapUangPage";
+import PenagihProfilPage from "./pages/penagih/ProfilPage";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
@@ -80,9 +84,13 @@ const App = () => (
             <Route path="/admin/pengaturan" element={<ProtectedRoute requiredRole="admin"><PengaturanPage /></ProtectedRoute>} />
             
             {/* Penagih Routes */}
-            <Route path="/penagih" element={<ProtectedRoute requiredRole="penagih"><PenagihDashboard /></ProtectedRoute>} />
+            <Route path="/penagih" element={<ProtectedRoute requiredRole="penagih"><RingkasanPage /></ProtectedRoute>} />
+            <Route path="/penagih/riwayat-tagihan" element={<ProtectedRoute requiredRole="penagih"><RiwayatTagihanPage /></ProtectedRoute>} />
+            <Route path="/penagih/input-pembayaran" element={<ProtectedRoute requiredRole="penagih"><InputPembayaranPage /></ProtectedRoute>} />
+            <Route path="/penagih/rekap-uang" element={<ProtectedRoute requiredRole="penagih"><RekapUangPage /></ProtectedRoute>} />
             <Route path="/penagih/anggota" element={<ProtectedRoute requiredRole="penagih"><PenagihAnggotaPage /></ProtectedRoute>} />
             <Route path="/penagih/tagihan" element={<ProtectedRoute requiredRole="penagih"><PenagihTagihanPage /></ProtectedRoute>} />
+            <Route path="/penagih/profil" element={<ProtectedRoute requiredRole="penagih"><PenagihProfilPage /></ProtectedRoute>} />
             
             {/* Anggota Routes */}
             <Route path="/anggota" element={<ProtectedRoute requiredRole="anggota"><AnggotaDashboard /></ProtectedRoute>} />

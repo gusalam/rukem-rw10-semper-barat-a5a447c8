@@ -1,0 +1,355 @@
+import { useEffect, useState, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { PenagihLayout } from '@/components/layout/PenagihLayout';
+import { PageHeader } from '@/components/ui/page-header';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { DataTable } from '@/components/ui/data-table';
+import { EmptyState } from '@/components/ui/empty-state';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { ImageUpload } from '@/components/ui/image-upload';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { CreditCard, Search, Plus } from 'lucide-react';
+import { formatCurrency, formatDate, formatPeriode } from '@/lib/format';
+import { toast } from 'sonner';
+import type { IuranTagihan, Anggota, MetodePembayaran } from '@/types/database';
+
+interface TagihanWithKK extends IuranTagihan {
+  kepala_keluarga?: Anggota;
+}
+
+export default function InputPembayaranPage() {
+  const { user, penagihWilayah } = useAuth();
+  const [tagihanList, setTagihanList] = useState<TagihanWithKK[]>([]);
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedTagihan, setSelectedTagihan] = useState<TagihanWithKK | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const [formData, setFormData] = useState({
+    nominal: '',
+    metode: 'tunai' as MetodePembayaran,
+    catatan: '',
+    bukti_url: '',
+  });
+
+  const fetchData = useCallback(async () => {
+    if (!user || penagihWilayah.length === 0) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const rtRwPairs = penagihWilayah.map(w => ({ rt: w.rt, rw: w.rw }));
+      
+      // Get anggota in penagih wilayah
+      const { data: anggotaData } = await supabase
+        .from('anggota')
+        .select('id, no_kk, rt, rw, nama_lengkap, hubungan_kk')
+        .eq('status', 'aktif');
+      
+      const filteredAnggota = anggotaData?.filter(a => 
+        rtRwPairs.some(pair => pair.rt === a.rt && pair.rw === a.rw)
+      ) || [];
+
+      const uniqueKKs = [...new Set(filteredAnggota.map(a => a.no_kk))];
+
+      if (uniqueKKs.length === 0) {
+        setTagihanList([]);
+        setLoading(false);
+        return;
+      }
+
+      // Fetch tagihan that are not paid
+      const { data: tagihanData } = await supabase
+        .from('iuran_tagihan')
+        .select('*')
+        .in('no_kk', uniqueKKs)
+        .in('status', ['belum_bayar'])
+        .order('jatuh_tempo', { ascending: true });
+
+      const processedData: TagihanWithKK[] = (tagihanData || []).map(t => {
+        const kepala = filteredAnggota.find(a => a.no_kk === t.no_kk && a.hubungan_kk === 'Kepala Keluarga')
+          || filteredAnggota.find(a => a.no_kk === t.no_kk);
+        return { ...t, kepala_keluarga: kepala as Anggota };
+      });
+
+      setTagihanList(processedData);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [user, penagihWilayah]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Realtime subscription
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel('penagih-input-pembayaran-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'iuran_tagihan' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'iuran_pembayaran' }, () => fetchData())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, fetchData]);
+
+  const openPaymentDialog = (tagihan: TagihanWithKK) => {
+    setSelectedTagihan(tagihan);
+    setFormData({
+      nominal: tagihan.nominal.toString(),
+      metode: 'tunai',
+      catatan: '',
+      bukti_url: '',
+    });
+    setDialogOpen(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!selectedTagihan || !user) return;
+
+    const nominal = parseInt(formData.nominal);
+    if (!nominal || nominal <= 0) {
+      toast.error('Nominal pembayaran tidak valid');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      // Insert pembayaran
+      const { error: pembayaranError } = await supabase
+        .from('iuran_pembayaran')
+        .insert({
+          tagihan_id: selectedTagihan.id,
+          penagih_user_id: user.id,
+          nominal,
+          metode: formData.metode,
+          catatan: formData.catatan || null,
+          bukti_url: formData.bukti_url || null,
+          status: 'menunggu_admin',
+          tanggal_bayar: new Date().toISOString(),
+        });
+
+      if (pembayaranError) throw pembayaranError;
+
+      // Update tagihan status
+      const { error: tagihanError } = await supabase
+        .from('iuran_tagihan')
+        .update({ status: 'menunggu_admin' })
+        .eq('id', selectedTagihan.id);
+
+      if (tagihanError) throw tagihanError;
+
+      toast.success('Pembayaran berhasil diinput, menunggu verifikasi admin');
+      setDialogOpen(false);
+      setSelectedTagihan(null);
+      fetchData();
+    } catch (error: any) {
+      console.error('Error submitting payment:', error);
+      toast.error(error.message || 'Gagal menyimpan pembayaran');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const filteredTagihan = tagihanList.filter(t => 
+    t.kepala_keluarga?.nama_lengkap?.toLowerCase().includes(search.toLowerCase()) ||
+    t.no_kk?.toLowerCase().includes(search.toLowerCase()) ||
+    t.periode?.includes(search)
+  );
+
+  const columns = [
+    {
+      key: 'nama_kk',
+      header: 'Nama KK',
+      cell: (item: TagihanWithKK) => (
+        <div>
+          <p className="font-medium text-sm">{item.kepala_keluarga?.nama_lengkap || '-'}</p>
+          <p className="text-xs text-muted-foreground">KK: {item.no_kk}</p>
+        </div>
+      ),
+    },
+    {
+      key: 'periode',
+      header: 'Periode',
+      cell: (item: TagihanWithKK) => formatPeriode(item.periode),
+    },
+    {
+      key: 'nominal',
+      header: 'Nominal',
+      cell: (item: TagihanWithKK) => (
+        <span className="font-medium text-primary">{formatCurrency(item.nominal)}</span>
+      ),
+    },
+    {
+      key: 'jatuh_tempo',
+      header: 'Jatuh Tempo',
+      cell: (item: TagihanWithKK) => formatDate(item.jatuh_tempo),
+      className: 'hidden md:table-cell',
+    },
+    {
+      key: 'actions',
+      header: '',
+      cell: (item: TagihanWithKK) => (
+        <Button size="sm" onClick={() => openPaymentDialog(item)}>
+          <Plus className="h-4 w-4 mr-1" />
+          Input
+        </Button>
+      ),
+    },
+  ];
+
+  if (loading) {
+    return (
+      <PenagihLayout>
+        <div className="space-y-6">
+          <Skeleton className="h-10 w-48" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-64" />
+        </div>
+      </PenagihLayout>
+    );
+  }
+
+  return (
+    <PenagihLayout>
+      <PageHeader 
+        title="Input Pembayaran" 
+        description="Input pembayaran dari anggota"
+      />
+
+      <div className="space-y-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Cari nama KK, No. KK, atau periode..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+
+        {filteredTagihan.length === 0 ? (
+          <EmptyState
+            icon={CreditCard}
+            title="Tidak Ada Tagihan"
+            description={search ? 'Tidak ada tagihan yang sesuai pencarian.' : 'Semua tagihan sudah dibayar atau sedang menunggu verifikasi.'}
+          />
+        ) : (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">
+                Tagihan Belum Dibayar ({filteredTagihan.length} tagihan)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <DataTable columns={columns} data={filteredTagihan} />
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Payment Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Input Pembayaran</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {selectedTagihan && (
+              <Card className="bg-muted/50">
+                <CardContent className="pt-4 space-y-1">
+                  <p className="text-sm font-medium">{selectedTagihan.kepala_keluarga?.nama_lengkap}</p>
+                  <p className="text-xs text-muted-foreground">Periode: {formatPeriode(selectedTagihan.periode)}</p>
+                  <p className="text-xs text-muted-foreground">Tagihan: {formatCurrency(selectedTagihan.nominal)}</p>
+                </CardContent>
+              </Card>
+            )}
+
+            <div className="space-y-2">
+              <Label>Nominal Pembayaran *</Label>
+              <Input
+                type="number"
+                value={formData.nominal}
+                onChange={(e) => setFormData({ ...formData, nominal: e.target.value })}
+                placeholder="Masukkan nominal"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Metode Pembayaran *</Label>
+              <Select 
+                value={formData.metode} 
+                onValueChange={(v) => setFormData({ ...formData, metode: v as MetodePembayaran })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="tunai">Tunai</SelectItem>
+                  <SelectItem value="transfer">Transfer</SelectItem>
+                  <SelectItem value="qris">QRIS</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Bukti Pembayaran</Label>
+              <ImageUpload
+                value={formData.bukti_url}
+                onChange={(url) => setFormData({ ...formData, bukti_url: url })}
+                bucket="bukti_pembayaran"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Catatan</Label>
+              <Textarea
+                value={formData.catatan}
+                onChange={(e) => setFormData({ ...formData, catatan: e.target.value })}
+                placeholder="Catatan tambahan (opsional)"
+              />
+            </div>
+
+            <div className="flex gap-2 justify-end">
+              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                Batal
+              </Button>
+              <Button type="submit" disabled={submitting}>
+                {submitting ? 'Menyimpan...' : 'Simpan Pembayaran'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </PenagihLayout>
+  );
+}

@@ -13,6 +13,9 @@ import {
   Menu,
   X,
   MapPin,
+  CreditCard,
+  TrendingUp,
+  User,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -21,9 +24,12 @@ interface PenagihLayoutProps {
 }
 
 const menuItems = [
-  { icon: Home, label: 'Dashboard', path: '/penagih' },
+  { icon: Home, label: 'Ringkasan', path: '/penagih' },
+  { icon: Receipt, label: 'Riwayat Tagihan', path: '/penagih/riwayat-tagihan' },
+  { icon: CreditCard, label: 'Input Pembayaran', path: '/penagih/input-pembayaran' },
+  { icon: TrendingUp, label: 'Rekap Uang', path: '/penagih/rekap-uang' },
   { icon: Users, label: 'Anggota Wilayah', path: '/penagih/anggota' },
-  { icon: Receipt, label: 'Tagihan', path: '/penagih/tagihan' },
+  { icon: User, label: 'Profil', path: '/penagih/profil' },
 ];
 
 export function PenagihLayout({ children }: PenagihLayoutProps) {
