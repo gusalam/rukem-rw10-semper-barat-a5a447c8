@@ -93,27 +93,20 @@ serve(async (req) => {
       .maybeSingle();
 
     if (penagihError || !penagihData) {
+      console.error('Penagih not found:', penagihError);
       return new Response(JSON.stringify({ error: 'Data penagih tidak ditemukan.' }), {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Step 1: Set penagih status to inactive
-    const { error: updatePenagihError } = await supabaseAdmin
-      .from('penagih')
-      .update({ status_aktif: false })
-      .eq('id', penagih_id);
+    // Store penagih data for audit log before deletion
+    const penagihDataForAudit = { ...penagihData };
 
-    if (updatePenagihError) {
-      console.error('Update penagih error:', updatePenagihError);
-      return new Response(JSON.stringify({ error: 'Gagal menonaktifkan penagih.' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Step 2: Remove wilayah assignments (but keep transaction history)
+    // ============================================
+    // STEP 1: Delete wilayah assignments
+    // ============================================
+    console.log('Step 1: Deleting wilayah assignments...');
     const { error: deleteWilayahError } = await supabaseAdmin
       .from('penagih_wilayah')
       .delete()
@@ -121,10 +114,15 @@ serve(async (req) => {
 
     if (deleteWilayahError) {
       console.error('Delete wilayah error:', deleteWilayahError);
-      // Continue anyway - not critical
+      // Continue - not critical for deletion
+    } else {
+      console.log('Step 1 completed: Wilayah deleted');
     }
 
-    // Step 3: Remove user role (so they can't login anymore as penagih)
+    // ============================================
+    // STEP 2: Delete user role (penagih)
+    // ============================================
+    console.log('Step 2: Deleting user role...');
     const { error: deleteRoleError } = await supabaseAdmin
       .from('user_roles')
       .delete()
@@ -133,43 +131,86 @@ serve(async (req) => {
 
     if (deleteRoleError) {
       console.error('Delete role error:', deleteRoleError);
-      // Continue anyway
+      // Continue - not critical
+    } else {
+      console.log('Step 2 completed: Role deleted');
     }
 
-    // Step 4: Disable the auth user (soft delete - keeps the user but can't login)
-    // We use updateUser with banned_until set to a far future date
-    const { error: banUserError } = await supabaseAdmin.auth.admin.updateUserById(
-      penagih_user_id,
-      { 
-        ban_duration: '876000h' // ~100 years
-      }
+    // ============================================
+    // STEP 3: Delete penagih record from penagih table
+    // ============================================
+    console.log('Step 3: Deleting penagih record...');
+    const { error: deletePenagihError } = await supabaseAdmin
+      .from('penagih')
+      .delete()
+      .eq('id', penagih_id);
+
+    if (deletePenagihError) {
+      console.error('Delete penagih error:', deletePenagihError);
+      return new Response(JSON.stringify({ error: 'Gagal menghapus data penagih dari database.' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    console.log('Step 3 completed: Penagih record deleted');
+
+    // ============================================
+    // STEP 4: Delete profile record
+    // ============================================
+    console.log('Step 4: Deleting profile record...');
+    const { error: deleteProfileError } = await supabaseAdmin
+      .from('profiles')
+      .delete()
+      .eq('user_id', penagih_user_id);
+
+    if (deleteProfileError) {
+      console.error('Delete profile error:', deleteProfileError);
+      // Continue - not critical
+    } else {
+      console.log('Step 4 completed: Profile deleted');
+    }
+
+    // ============================================
+    // STEP 5: Delete from Supabase Auth (PERMANENT)
+    // ============================================
+    console.log('Step 5: Deleting from Supabase Auth...');
+    const { error: deleteAuthError } = await supabaseAdmin.auth.admin.deleteUser(
+      penagih_user_id
     );
 
-    if (banUserError) {
-      console.error('Ban user error:', banUserError);
-      // Continue anyway - penagih already deactivated
+    if (deleteAuthError) {
+      console.error('Delete auth user error:', deleteAuthError);
+      return new Response(JSON.stringify({ error: 'Gagal menghapus akun login penagih. Silakan coba lagi atau hubungi administrator.' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
+    console.log('Step 5 completed: Auth user deleted');
 
-    console.log('Penagih account deleted successfully:', penagih_user_id);
-
-    // Log to audit
+    // ============================================
+    // STEP 6: Log to audit
+    // ============================================
+    console.log('Step 6: Creating audit log...');
     try {
       await supabaseAdmin.from('audit_log').insert({
         user_id: callerUser.id,
-        aksi: 'delete',
+        aksi: 'delete_permanent',
         tabel: 'penagih',
         record_id: penagih_id,
-        data_lama: penagihData,
+        data_lama: penagihDataForAudit,
         data_baru: null,
       });
+      console.log('Step 6 completed: Audit log created');
     } catch (auditError) {
       console.error('Audit log error:', auditError);
       // Don't fail the operation for audit log error
     }
 
+    console.log('Penagih account permanently deleted:', penagih_user_id);
+
     return new Response(JSON.stringify({ 
       success: true, 
-      message: `Akun penagih ${penagihData.nama_lengkap} berhasil dihapus. Data transaksi tetap tersimpan.`
+      message: `Akun penagih ${penagihDataForAudit.nama_lengkap} berhasil dihapus permanen. Data transaksi tetap tersimpan untuk keperluan audit.`
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
