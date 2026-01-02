@@ -14,9 +14,10 @@ serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     
-    // Create admin client with service role
+    // Create admin client with service role for privileged operations
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
       auth: {
         autoRefreshToken: false,
@@ -24,18 +25,28 @@ serve(async (req) => {
       },
     });
 
-    // Verify caller is admin
+    // Verify caller using the Authorization header
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
+      console.error('No authorization header');
       return new Response(JSON.stringify({ error: 'Sesi tidak valid. Silakan login ulang.' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
     
-    const token = authHeader.replace('Bearer ', '');
+    // Create a client with the user's token to verify their session
+    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: { Authorization: authHeader },
+      },
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
     
-    const { data: { user: callerUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    const { data: { user: callerUser }, error: authError } = await supabaseClient.auth.getUser();
     if (authError || !callerUser) {
       console.error('Auth error:', authError);
       return new Response(JSON.stringify({ error: 'Sesi tidak valid. Silakan login ulang.' }), {
@@ -43,6 +54,8 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+    
+    console.log('Caller verified:', callerUser.id, callerUser.email);
 
     // Check if caller is admin
     const { data: roleData, error: roleError } = await supabaseAdmin
