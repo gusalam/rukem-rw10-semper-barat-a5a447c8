@@ -8,8 +8,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { DashboardSkeleton } from '@/components/ui/loading-skeleton';
 import { formatCurrency, formatPeriode, formatDate } from '@/lib/format';
-import { Receipt, CheckCircle, Clock, AlertCircle, Wallet, Bell } from 'lucide-react';
-import type { IuranTagihan, Pengaturan, Notifikasi } from '@/types/database';
+import { Receipt, CheckCircle, Clock, AlertCircle, Wallet, Bell, TrendingUp, Calendar } from 'lucide-react';
+import type { IuranTagihan, Pengaturan, Notifikasi, IuranPembayaran } from '@/types/database';
+
+interface PembayaranWithTagihan extends IuranPembayaran {
+  tagihan?: IuranTagihan;
+}
 
 export default function AnggotaDashboard() {
   const { anggota, user } = useAuth();
@@ -17,20 +21,26 @@ export default function AnggotaDashboard() {
   const [pengaturan, setPengaturan] = useState<Pengaturan | null>(null);
   const [notifikasi, setNotifikasi] = useState<Notifikasi[]>([]);
   const [saldoKas, setSaldoKas] = useState(0);
+  const [totalIuranDibayar, setTotalIuranDibayar] = useState(0);
+  const [riwayatPembayaran, setRiwayatPembayaran] = useState<PembayaranWithTagihan[]>([]);
+  const [currentMonthStatus, setCurrentMonthStatus] = useState<'belum_bayar' | 'menunggu_admin' | 'lunas' | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
     if (!anggota) return;
     
     try {
-      const [settingsRes, tagihanRes, kasRes, notifRes] = await Promise.all([
+      // Get current month period (format: YYYY-MM)
+      const now = new Date();
+      const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+      const [settingsRes, tagihanRes, kasRes, notifRes, pembayaranRes] = await Promise.all([
         supabase.from('pengaturan').select('*').limit(1).maybeSingle(),
         supabase
           .from('iuran_tagihan')
           .select('*')
           .eq('no_kk', anggota.no_kk)
-          .order('jatuh_tempo', { ascending: false })
-          .limit(6),
+          .order('periode', { ascending: false }),
         supabase.from('kas').select('jenis, nominal'),
         user ? supabase
           .from('notifikasi')
@@ -38,15 +48,44 @@ export default function AnggotaDashboard() {
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
           .limit(5) : Promise.resolve({ data: [] }),
+        // Get all approved payments for this KK
+        supabase
+          .from('iuran_pembayaran')
+          .select('*, iuran_tagihan(*)')
+          .eq('status', 'disetujui')
+          .order('tanggal_bayar', { ascending: false }),
       ]);
       
       setPengaturan(settingsRes.data as Pengaturan);
-      setTagihanList(tagihanRes.data as IuranTagihan[] || []);
+      
+      const allTagihan = tagihanRes.data as IuranTagihan[] || [];
+      setTagihanList(allTagihan.slice(0, 6));
+      
+      // Find current month status
+      const currentMonthTagihan = allTagihan.find(t => t.periode === currentPeriod);
+      setCurrentMonthStatus(currentMonthTagihan?.status as any || null);
+      
       setNotifikasi(notifRes.data as Notifikasi[] || []);
       
       // Calculate saldo kas
       const saldo = kasRes.data?.reduce((acc, k) => acc + (k.jenis === 'pemasukan' ? k.nominal : -k.nominal), 0) || 0;
       setSaldoKas(saldo);
+
+      // Filter pembayaran for this KK and calculate total
+      const pembayaranData = pembayaranRes.data || [];
+      const kkTagihanIds = allTagihan.map(t => t.id);
+      const kkPembayaran = pembayaranData.filter((p: any) => 
+        kkTagihanIds.includes(p.tagihan_id)
+      ).map((p: any) => ({
+        ...p,
+        tagihan: p.iuran_tagihan
+      }));
+      
+      setRiwayatPembayaran(kkPembayaran as PembayaranWithTagihan[]);
+      
+      // Calculate total paid
+      const totalPaid = kkPembayaran.reduce((sum: number, p: any) => sum + p.nominal, 0);
+      setTotalIuranDibayar(totalPaid);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -121,6 +160,21 @@ export default function AnggotaDashboard() {
   const lunas = tagihanList.filter(t => t.status === 'lunas').length;
   const unreadNotif = notifikasi.filter(n => !n.dibaca).length;
 
+  const getCurrentMonthStatusLabel = () => {
+    switch (currentMonthStatus) {
+      case 'belum_bayar':
+        return { label: 'Belum Bayar', variant: 'destructive' as const, icon: AlertCircle };
+      case 'menunggu_admin':
+        return { label: 'Menunggu Verifikasi', variant: 'warning' as const, icon: Clock };
+      case 'lunas':
+        return { label: 'Lunas', variant: 'success' as const, icon: CheckCircle };
+      default:
+        return { label: 'Tidak ada tagihan', variant: 'secondary' as const, icon: Calendar };
+    }
+  };
+
+  const statusInfo = getCurrentMonthStatusLabel();
+
   if (loading) {
     return (
       <AnggotaLayout>
@@ -142,7 +196,15 @@ export default function AnggotaDashboard() {
         description="Berikut ringkasan keanggotaan Anda"
       />
 
-      <div className="grid gap-4 md:grid-cols-4 mt-6">
+      {/* Summary Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mt-6">
+        <StatCard
+          title="Total Iuran Saya"
+          value={formatCurrency(totalIuranDibayar)}
+          icon={TrendingUp}
+          description="Akumulasi iuran yang sudah dibayar"
+          iconClassName="bg-success/10"
+        />
         <StatCard
           title="Saldo Kas RUKEM"
           value={formatCurrency(saldoKas)}
@@ -150,24 +212,50 @@ export default function AnggotaDashboard() {
           iconClassName="bg-primary/10"
         />
         <StatCard
-          title="Belum Bayar"
+          title="Tagihan Belum Bayar"
           value={belumBayar}
           icon={AlertCircle}
-          iconClassName="bg-warning/10"
+          iconClassName="bg-destructive/10"
         />
         <StatCard
-          title="Menunggu Verifikasi"
-          value={menunggu}
-          icon={Clock}
-          iconClassName="bg-info/10"
-        />
-        <StatCard
-          title="Lunas"
+          title="Tagihan Lunas"
           value={lunas}
           icon={CheckCircle}
           iconClassName="bg-success/10"
         />
       </div>
+
+      {/* Status Iuran Bulan Berjalan */}
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <Calendar className="h-4 w-4" />
+            Status Iuran Bulan Ini
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-lg ${
+                currentMonthStatus === 'lunas' ? 'bg-success/10' :
+                currentMonthStatus === 'menunggu_admin' ? 'bg-warning/10' :
+                'bg-destructive/10'
+              }`}>
+                <statusInfo.icon className={`h-5 w-5 ${
+                  currentMonthStatus === 'lunas' ? 'text-success' :
+                  currentMonthStatus === 'menunggu_admin' ? 'text-warning' :
+                  'text-destructive'
+                }`} />
+              </div>
+              <div>
+                <p className="font-medium">{new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}</p>
+                <p className="text-sm text-muted-foreground">Status pembayaran bulan ini</p>
+              </div>
+            </div>
+            <StatusBadge status={currentMonthStatus || 'belum_bayar'} />
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Notifikasi */}
       {notifikasi.length > 0 && (
@@ -211,9 +299,49 @@ export default function AnggotaDashboard() {
         </Card>
       )}
 
+      {/* Riwayat Pembayaran Iuran */}
       <Card className="mt-6">
         <CardHeader>
-          <CardTitle className="text-base font-semibold">Tagihan Iuran</CardTitle>
+          <CardTitle className="text-base font-semibold">Riwayat Pembayaran Iuran</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {riwayatPembayaran.length === 0 ? (
+            <p className="text-center text-muted-foreground py-4">Belum ada riwayat pembayaran</p>
+          ) : (
+            <div className="space-y-3">
+              {riwayatPembayaran.slice(0, 10).map((pembayaran) => (
+                <div
+                  key={pembayaran.id}
+                  className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-success/10">
+                      <CheckCircle className="h-5 w-5 text-success" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm">
+                        {pembayaran.tagihan ? formatPeriode(pembayaran.tagihan.periode) : 'Iuran'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDate(pembayaran.tanggal_bayar)} • {pembayaran.metode}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-sm text-success">{formatCurrency(pembayaran.nominal)}</p>
+                    <p className="text-xs text-muted-foreground">Disetujui</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Tagihan Iuran */}
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle className="text-base font-semibold">Tagihan Iuran Terkini</CardTitle>
         </CardHeader>
         <CardContent>
           {tagihanList.length === 0 ? (
