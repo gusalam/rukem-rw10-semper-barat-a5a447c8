@@ -107,10 +107,37 @@ export default function KematianPage() {
       return;
     }
 
+    // Check for duplicate - prevent double entry for same anggota
+    const existingKematian = kematianList.find(k => k.anggota_id === formData.anggota_id);
+    if (existingKematian) {
+      const anggotaNama = anggotaList.find(a => a.id === formData.anggota_id)?.nama_lengkap || 'Anggota';
+      toast({
+        variant: 'destructive',
+        title: '⚠️ Data Duplikat',
+        description: `Data kematian untuk ${anggotaNama} sudah tercatat sebelumnya. Tidak dapat mencatat data kematian yang sama dua kali.`,
+      });
+      return;
+    }
+
+    // Check if anggota status is already 'meninggal'
+    const selectedAnggota = anggotaList.find(a => a.id === formData.anggota_id);
+    if (selectedAnggota?.status === 'meninggal') {
+      toast({
+        variant: 'destructive',
+        title: '⚠️ Status Tidak Valid',
+        description: `${selectedAnggota.nama_lengkap} sudah berstatus meninggal.`,
+      });
+      return;
+    }
+
     setSubmitting(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
+      if (!user) {
+        throw new Error('Sesi tidak valid. Silakan login ulang.');
+      }
+
       // Create kematian record
       const { data: kematianData, error: kematianError } = await supabase
         .from('kematian')
@@ -121,25 +148,33 @@ export default function KematianPage() {
           penyebab: formData.penyebab || null,
           keterangan: formData.keterangan || null,
           tunggakan_total: selectedAnggotaInfo?.tunggakan || 0,
-          created_by: user?.id,
+          created_by: user.id,
         })
         .select()
         .single();
 
-      if (kematianError) throw kematianError;
+      if (kematianError) {
+        console.error('Kematian insert error:', kematianError);
+        throw new Error(`Gagal menyimpan data kematian: ${kematianError.message}`);
+      }
 
       // Update anggota status
-      await supabase
+      const { error: anggotaError } = await supabase
         .from('anggota')
         .update({ status: 'meninggal' })
         .eq('id', formData.anggota_id);
+
+      if (anggotaError) {
+        console.error('Anggota update error:', anggotaError);
+        // Don't throw, just log - kematian is already saved
+      }
 
       // Create santunan record
       if (pengaturan && kematianData) {
         const tunggakan = selectedAnggotaInfo?.tunggakan || 0;
         const nominalAkhir = Math.max(0, pengaturan.nominal_santunan - tunggakan);
 
-        await supabase.from('santunan').insert({
+        const { error: santunanError } = await supabase.from('santunan').insert({
           kematian_id: kematianData.id,
           anggota_id: formData.anggota_id,
           nominal_dasar: pengaturan.nominal_santunan,
@@ -147,6 +182,11 @@ export default function KematianPage() {
           nominal_akhir: nominalAkhir,
           status: 'pending',
         });
+
+        if (santunanError) {
+          console.error('Santunan insert error:', santunanError);
+          // Don't throw, just log - kematian is already saved
+        }
       }
 
       toast({ 
@@ -164,10 +204,12 @@ export default function KematianPage() {
       setSelectedAnggotaInfo(null);
       fetchData();
     } catch (error: unknown) {
+      console.error('Kematian submit error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Terjadi kesalahan saat menyimpan data';
       toast({
         variant: 'destructive',
-        title: '✕ Gagal',
-        description: getErrorMessage(error, StandardMessages.error.save),
+        title: '✕ Gagal Menyimpan',
+        description: errorMessage,
       });
     } finally {
       setSubmitting(false);
