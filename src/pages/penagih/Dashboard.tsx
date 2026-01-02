@@ -9,9 +9,12 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ExportButtons } from '@/components/ui/export-buttons';
 import { Users, Clock, CheckCircle, MapPin, AlertCircle, CreditCard, TrendingUp, Calendar, Receipt } from 'lucide-react';
 import { formatCurrency, formatPeriode, formatDate } from '@/lib/format';
+import { exportToPDF, exportToExcel } from '@/lib/export';
 import { Link } from 'react-router-dom';
+import { toast } from 'sonner';
 import type { IuranTagihan, Anggota, IuranPembayaran } from '@/types/database';
 
 interface TagihanWithKK extends IuranTagihan {
@@ -214,6 +217,62 @@ export default function PenagihDashboard() {
       default:
         return status;
     }
+  };
+
+  // Export functions
+  const exportColumns = [
+    { key: 'no', header: 'No' },
+    { key: 'nama_kk', header: 'Nama KK' },
+    { key: 'no_kk', header: 'No. KK' },
+    { key: 'periode', header: 'Periode', format: (v: string) => v ? formatPeriode(v) : '-' },
+    { key: 'tanggal_bayar', header: 'Tanggal Bayar', format: (v: string) => formatDate(v) },
+    { key: 'nominal', header: 'Nominal', format: (v: number) => formatCurrency(v) },
+    { key: 'metode', header: 'Metode' },
+    { key: 'status', header: 'Status', format: (v: string) => getStatusLabel(v) },
+  ];
+
+  const getExportData = () => {
+    return riwayatPembayaran.map((p, idx) => ({
+      no: idx + 1,
+      nama_kk: p.kepala_keluarga?.nama_lengkap || '-',
+      no_kk: p.tagihan?.no_kk || '-',
+      periode: p.tagihan?.periode || '',
+      tanggal_bayar: p.tanggal_bayar,
+      nominal: p.nominal,
+      metode: p.metode,
+      status: p.status,
+    }));
+  };
+
+  const handleExportPDF = () => {
+    const data = getExportData();
+    if (data.length === 0) {
+      toast.error('Tidak ada data untuk di-export');
+      return;
+    }
+    const wilayahText = penagihWilayah.map(w => `RT ${w.rt}/RW ${w.rw}`).join(', ');
+    exportToPDF(
+      data,
+      exportColumns,
+      `Laporan Pembayaran Penagih - ${wilayahText}`,
+      `laporan-pembayaran-${new Date().toISOString().split('T')[0]}`
+    );
+    toast.success('Berhasil export ke PDF');
+  };
+
+  const handleExportExcel = () => {
+    const data = getExportData();
+    if (data.length === 0) {
+      toast.error('Tidak ada data untuk di-export');
+      return;
+    }
+    exportToExcel(
+      data,
+      exportColumns,
+      'Pembayaran',
+      `laporan-pembayaran-${new Date().toISOString().split('T')[0]}`
+    );
+    toast.success('Berhasil export ke Excel');
   };
 
   if (loading) {
@@ -467,8 +526,13 @@ export default function PenagihDashboard() {
             {/* Riwayat Input Pembayaran Tab */}
             <TabsContent value="pembayaran">
               <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Riwayat Input Pembayaran</CardTitle>
+                  <ExportButtons 
+                    onExportPDF={handleExportPDF}
+                    onExportExcel={handleExportExcel}
+                    disabled={riwayatPembayaran.length === 0}
+                  />
                 </CardHeader>
                 <CardContent>
                   {riwayatPembayaran.length === 0 ? (
