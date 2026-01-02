@@ -56,8 +56,10 @@ export default function PenagihPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [wilayahDialogOpen, setWilayahDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletePenagihDialogOpen, setDeletePenagihDialogOpen] = useState(false);
   const [selectedPenagih, setSelectedPenagih] = useState<PenagihWithWilayah | null>(null);
   const [selectedWilayah, setSelectedWilayah] = useState<PenagihWilayah | null>(null);
+  const [penagihToDelete, setPenagihToDelete] = useState<PenagihWithWilayah | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   
   // Available RT/RW options from anggota data
@@ -519,6 +521,49 @@ export default function PenagihPage() {
     }
   };
 
+  const openDeletePenagihDialog = (penagih: PenagihWithWilayah) => {
+    setPenagihToDelete(penagih);
+    setDeletePenagihDialogOpen(true);
+  };
+
+  const handleDeletePenagih = async () => {
+    if (!penagihToDelete) return;
+
+    setSubmitting(true);
+    try {
+      const response = await supabase.functions.invoke('delete-penagih-account', {
+        body: {
+          penagih_user_id: penagihToDelete.user_id,
+          penagih_id: penagihToDelete.id,
+        },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Gagal menghapus penagih');
+      }
+
+      if (response.data?.error) {
+        throw new Error(response.data.error);
+      }
+
+      toast({ 
+        title: '✓ Penagih Dihapus', 
+        description: `Akun ${penagihToDelete.nama_lengkap} berhasil dihapus. Data transaksi tetap tersimpan.` 
+      });
+      setDeletePenagihDialogOpen(false);
+      setPenagihToDelete(null);
+      fetchData();
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Gagal Menghapus Penagih',
+        description: error.message || 'Terjadi kesalahan saat menghapus penagih',
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const filteredPenagih = penagihList.filter((p) =>
     p.nama_lengkap?.toLowerCase().includes(search.toLowerCase()) ||
     p.email?.toLowerCase().includes(search.toLowerCase()) ||
@@ -602,6 +647,15 @@ export default function PenagihPage() {
           >
             <Plus className="h-4 w-4 mr-1" />
             Wilayah
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-destructive hover:text-destructive"
+            onClick={() => openDeletePenagihDialog(item)}
+            title="Hapus Penagih"
+          >
+            <Trash2 className="h-4 w-4" />
           </Button>
         </div>
       ),
@@ -915,13 +969,23 @@ export default function PenagihPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
+      {/* Delete Wilayah Confirmation */}
       <DeleteConfirmDialog
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
         onConfirm={handleDeleteWilayah}
         title="Hapus Wilayah"
         description={`Apakah Anda yakin ingin menghapus wilayah RT ${selectedWilayah?.rt}/RW ${selectedWilayah?.rw}? Penagih tidak akan bisa mengakses data di wilayah ini.`}
+        loading={submitting}
+      />
+
+      {/* Delete Penagih Confirmation */}
+      <DeleteConfirmDialog
+        open={deletePenagihDialogOpen}
+        onOpenChange={setDeletePenagihDialogOpen}
+        onConfirm={handleDeletePenagih}
+        title="Hapus Akun Penagih"
+        description={`Apakah Anda yakin ingin menghapus akun penagih "${penagihToDelete?.nama_lengkap}"? Akun akan dinonaktifkan dan tidak bisa login lagi. Data transaksi pembayaran tetap tersimpan.`}
         loading={submitting}
       />
     </AdminLayout>
