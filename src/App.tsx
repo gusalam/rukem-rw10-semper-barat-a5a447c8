@@ -29,6 +29,7 @@ import RiwayatTagihanPage from "./pages/penagih/RiwayatTagihanPage";
 import InputPembayaranPage from "./pages/penagih/InputPembayaranPage";
 import RekapUangPage from "./pages/penagih/RekapUangPage";
 import PenagihProfilPage from "./pages/penagih/ProfilPage";
+import DetailTagihanKKPage from "./pages/penagih/DetailTagihanKKPage";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
@@ -92,6 +93,7 @@ const App = () => (
             <Route path="/penagih/rekap-uang" element={<ProtectedRoute requiredRole="penagih"><RekapUangPage /></ProtectedRoute>} />
             <Route path="/penagih/anggota" element={<ProtectedRoute requiredRole="penagih"><PenagihAnggotaPage /></ProtectedRoute>} />
             <Route path="/penagih/tagihan" element={<ProtectedRoute requiredRole="penagih"><PenagihTagihanPage /></ProtectedRoute>} />
+            <Route path="/penagih/tagihan/:noKK" element={<ProtectedRoute requiredRole="penagih"><DetailTagihanKKPage /></ProtectedRoute>} />
             <Route path="/penagih/profil" element={<ProtectedRoute requiredRole="penagih"><PenagihProfilPage /></ProtectedRoute>} />
             
             {/* Anggota Routes */}

@@ -145,7 +145,7 @@ export function PenagihLayout({ children }: PenagihLayoutProps) {
 
       {/* Main content */}
       <main className="lg:ml-64 pt-16 lg:pt-0 min-h-screen">
-        <div className="p-4 lg:p-8">
+        <div className="p-4 lg:p-8 animate-fade-in">
           {children}
         </div>
       </main>

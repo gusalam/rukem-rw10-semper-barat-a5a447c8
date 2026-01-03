@@ -1,15 +1,17 @@
 import { useEffect, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { PenagihLayout } from '@/components/layout/PenagihLayout';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/ui/data-table';
 import { EmptyState } from '@/components/ui/empty-state';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { FileText, Search } from 'lucide-react';
+import { FileText, Search, Eye } from 'lucide-react';
 import { formatCurrency, formatDate, formatPeriode } from '@/lib/format';
 import type { IuranTagihan, Anggota } from '@/types/database';
 
@@ -19,6 +21,7 @@ interface TagihanWithKK extends IuranTagihan {
 
 export default function RiwayatTagihanPage() {
   const { user, penagihWilayah } = useAuth();
+  const navigate = useNavigate();
   const [tagihanList, setTagihanList] = useState<TagihanWithKK[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -151,6 +154,20 @@ export default function RiwayatTagihanPage() {
           status={getStatusLabel(item.status)} 
           variant={getStatusVariant(item.status) as any} 
         />
+      ),
+    },
+    {
+      key: 'actions',
+      header: '',
+      cell: (item: TagihanWithKK) => (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => navigate(`/penagih/tagihan/${encodeURIComponent(item.no_kk)}`)}
+        >
+          <Eye className="h-4 w-4" />
+          <span className="hidden sm:inline ml-1">Detail</span>
+        </Button>
       ),
     },
   ];
