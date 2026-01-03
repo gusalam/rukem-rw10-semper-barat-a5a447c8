@@ -22,6 +22,7 @@ import AnggotaIuranPage from "./pages/anggota/IuranPage";
 import AnggotaRiwayatPage from "./pages/anggota/RiwayatPage";
 import AnggotaProfilPage from "./pages/anggota/ProfilPage";
 import RingkasanPage from "./pages/penagih/RingkasanPage";
+import PenagihDashboard from "./pages/penagih/Dashboard";
 import PenagihAnggotaPage from "./pages/penagih/AnggotaPage";
 import PenagihTagihanPage from "./pages/penagih/TagihanPage";
 import RiwayatTagihanPage from "./pages/penagih/RiwayatTagihanPage";
@@ -84,7 +85,8 @@ const App = () => (
             <Route path="/admin/pengaturan" element={<ProtectedRoute requiredRole="admin"><PengaturanPage /></ProtectedRoute>} />
             
             {/* Penagih Routes */}
-            <Route path="/penagih" element={<ProtectedRoute requiredRole="penagih"><RingkasanPage /></ProtectedRoute>} />
+            <Route path="/penagih" element={<ProtectedRoute requiredRole="penagih"><PenagihDashboard /></ProtectedRoute>} />
+            <Route path="/penagih/ringkasan" element={<ProtectedRoute requiredRole="penagih"><RingkasanPage /></ProtectedRoute>} />
             <Route path="/penagih/riwayat-tagihan" element={<ProtectedRoute requiredRole="penagih"><RiwayatTagihanPage /></ProtectedRoute>} />
             <Route path="/penagih/input-pembayaran" element={<ProtectedRoute requiredRole="penagih"><InputPembayaranPage /></ProtectedRoute>} />
             <Route path="/penagih/rekap-uang" element={<ProtectedRoute requiredRole="penagih"><RekapUangPage /></ProtectedRoute>} />
