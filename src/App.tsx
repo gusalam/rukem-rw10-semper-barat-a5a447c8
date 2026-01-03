@@ -20,6 +20,8 @@ import AnggotaDashboard from "./pages/anggota/Dashboard";
 import AnggotaNotifikasiPage from "./pages/anggota/NotifikasiPage";
 import AnggotaIuranPage from "./pages/anggota/IuranPage";
 import AnggotaRiwayatPage from "./pages/anggota/RiwayatPage";
+import AnggotaKeluargaPage from "./pages/anggota/KeluargaPage";
+import AnggotaSantunanPage from "./pages/anggota/SantunanPage";
 import AnggotaProfilPage from "./pages/anggota/ProfilPage";
 import RingkasanPage from "./pages/penagih/RingkasanPage";
 import PenagihDashboard from "./pages/penagih/Dashboard";
@@ -101,6 +103,8 @@ const App = () => (
             <Route path="/anggota/notifikasi" element={<ProtectedRoute requiredRole="anggota"><AnggotaNotifikasiPage /></ProtectedRoute>} />
             <Route path="/anggota/iuran" element={<ProtectedRoute requiredRole="anggota"><AnggotaIuranPage /></ProtectedRoute>} />
             <Route path="/anggota/riwayat" element={<ProtectedRoute requiredRole="anggota"><AnggotaRiwayatPage /></ProtectedRoute>} />
+            <Route path="/anggota/keluarga" element={<ProtectedRoute requiredRole="anggota"><AnggotaKeluargaPage /></ProtectedRoute>} />
+            <Route path="/anggota/santunan" element={<ProtectedRoute requiredRole="anggota"><AnggotaSantunanPage /></ProtectedRoute>} />
             <Route path="/anggota/profil" element={<ProtectedRoute requiredRole="anggota"><AnggotaProfilPage /></ProtectedRoute>} />
             
             <Route path="*" element={<NotFound />} />
