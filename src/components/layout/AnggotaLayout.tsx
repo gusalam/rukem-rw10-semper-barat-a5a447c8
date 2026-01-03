@@ -4,8 +4,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
 import { LogoutConfirmDialog } from '@/components/auth/LogoutConfirmDialog';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
@@ -17,106 +15,35 @@ import {
   History,
   User,
   LogOut,
-  Menu,
   Bell,
-  ChevronRight,
+  ArrowLeft,
+  Users,
+  HandHeart,
 } from 'lucide-react';
 
 const anggotaMenuItems = [
-  { icon: LayoutDashboard, label: 'Dashboard', href: '/anggota', showBadge: false },
-  { icon: Bell, label: 'Notifikasi', href: '/anggota/notifikasi', showBadge: true },
-  { icon: Receipt, label: 'Iuran Saya', href: '/anggota/iuran', showBadge: false },
-  { icon: History, label: 'Riwayat', href: '/anggota/riwayat', showBadge: false },
-  { icon: User, label: 'Profil', href: '/anggota/profil', showBadge: false },
+  { icon: LayoutDashboard, label: 'Beranda', path: '/anggota' },
+  { icon: Bell, label: 'Notifikasi', path: '/anggota/notifikasi', showBadge: true },
+  { icon: Receipt, label: 'Iuran', path: '/anggota/iuran' },
+  { icon: History, label: 'Riwayat', path: '/anggota/riwayat' },
+  { icon: User, label: 'Profil', path: '/anggota/profil' },
 ];
 
 interface AnggotaLayoutProps {
   children: React.ReactNode;
+  showBackButton?: boolean;
+  title?: string;
 }
 
-function SidebarContent({ 
-  onNavigate, 
-  unreadCount,
-  onLogoutClick,
-  anggotaName,
-}: { 
-  onNavigate?: () => void;
-  unreadCount: number;
-  onLogoutClick: () => void;
-  anggotaName: string;
-}) {
+export function AnggotaLayout({ children, showBackButton = true, title }: AnggotaLayoutProps) {
   const location = useLocation();
-
-  return (
-    <div className="flex h-full flex-col">
-      <div className="flex h-16 items-center gap-2 border-b px-4">
-        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10">
-          <Heart className="w-5 h-5 text-primary" />
-        </div>
-        <div>
-          <h1 className="font-bold text-sm">RUKEM</h1>
-          <p className="text-xs text-muted-foreground truncate max-w-[140px]">
-            {anggotaName}
-          </p>
-        </div>
-      </div>
-
-      <ScrollArea className="flex-1 px-3 py-4">
-        <nav className="space-y-1">
-          {anggotaMenuItems.map((item) => {
-            const isActive = location.pathname === item.href || 
-              (item.href !== '/anggota' && location.pathname.startsWith(item.href));
-            
-            return (
-              <Link
-                key={item.href}
-                to={item.href}
-                onClick={onNavigate}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                )}
-              >
-                <item.icon className="h-4 w-4" />
-                {item.label}
-                {item.showBadge && unreadCount > 0 && (
-                  <Badge 
-                    variant={isActive ? "secondary" : "destructive"} 
-                    className="ml-auto h-5 min-w-[20px] px-1.5 text-xs"
-                  >
-                    {unreadCount > 99 ? '99+' : unreadCount}
-                  </Badge>
-                )}
-                {isActive && !item.showBadge && <ChevronRight className="ml-auto h-4 w-4" />}
-              </Link>
-            );
-          })}
-        </nav>
-      </ScrollArea>
-
-      <div className="border-t p-3">
-        <Button
-          variant="ghost"
-          className="w-full justify-start text-muted-foreground hover:text-destructive"
-          onClick={onLogoutClick}
-        >
-          <LogOut className="mr-3 h-4 w-4" />
-          Keluar
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-export function AnggotaLayout({ children }: AnggotaLayoutProps) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const navigate = useNavigate();
   const [unreadCount, setUnreadCount] = useState(0);
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const { anggota, user, signOut } = useAuth();
-  const navigate = useNavigate();
+
+  const isDashboard = location.pathname === '/anggota';
 
   useEffect(() => {
     if (user) {
@@ -129,7 +56,7 @@ export function AnggotaLayout({ children }: AnggotaLayoutProps) {
     if (!user) return;
 
     const channel = supabase
-      .channel('sidebar-notifikasi-count')
+      .channel('anggota-notifikasi-count')
       .on(
         'postgres_changes',
         {
@@ -174,69 +101,141 @@ export function AnggotaLayout({ children }: AnggotaLayoutProps) {
     }
   };
 
-  const handleLogoutClick = () => {
-    setLogoutDialogOpen(true);
-    setSidebarOpen(false);
-  };
-
   return (
     <div className="min-h-screen bg-background">
-      {/* Network Status Banner */}
       <NetworkStatus />
       
-      {/* Desktop Sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-50 hidden w-64 border-r bg-card lg:block">
-        <SidebarContent 
-          unreadCount={unreadCount} 
-          onLogoutClick={handleLogoutClick}
-          anggotaName={anggota?.nama_lengkap || 'Anggota'}
-        />
-      </aside>
-
-      {/* Mobile Header */}
-      <header className="sticky top-0 z-40 flex h-16 items-center gap-4 border-b bg-card/95 backdrop-blur px-4 lg:hidden">
-        <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-          <SheetTrigger asChild>
-            <Button variant="ghost" size="icon">
-              <Menu className="h-5 w-5" />
+      {/* Header */}
+      <header className="sticky top-0 z-50 bg-background border-b">
+        <div className="flex items-center justify-between p-4">
+          <div className="flex items-center gap-3">
+            {showBackButton && !isDashboard && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate('/anggota')}
+                className="shrink-0"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+            )}
+            {isDashboard ? (
+              <>
+                <div className="p-2 rounded-full bg-primary/10">
+                  <Heart className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <h1 className="font-bold text-lg">RUKEM</h1>
+                  <p className="text-xs text-muted-foreground truncate max-w-[180px]">
+                    {anggota?.nama_lengkap || 'Anggota'}
+                  </p>
+                </div>
+              </>
+            ) : (
+              <div>
+                <h1 className="font-bold text-lg">{title || getPageTitle(location.pathname)}</h1>
+                <p className="text-xs text-muted-foreground truncate max-w-[200px]">
+                  {anggota?.nama_lengkap || 'Anggota'}
+                </p>
+              </div>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <Link to="/anggota/notifikasi" className="relative">
+              <Button variant="ghost" size="icon">
+                <Bell className="h-5 w-5" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-destructive px-1 text-xs font-medium text-destructive-foreground">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </Button>
+            </Link>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-destructive hover:text-destructive"
+              onClick={() => setLogoutDialogOpen(true)}
+            >
+              <LogOut className="h-5 w-5" />
             </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="w-64 p-0">
-            <SidebarContent 
-              onNavigate={() => setSidebarOpen(false)} 
-              unreadCount={unreadCount}
-              onLogoutClick={handleLogoutClick}
-              anggotaName={anggota?.nama_lengkap || 'Anggota'}
-            />
-          </SheetContent>
-        </Sheet>
-        
-        <div className="flex items-center gap-2">
-          <Heart className="w-5 h-5 text-primary" />
-          <span className="font-bold truncate">{anggota?.nama_lengkap || 'RUKEM'}</span>
-        </div>
-
-        <div className="flex items-center gap-1 ml-auto">
-          <ThemeToggle />
-          <Link to="/anggota/notifikasi" className="relative">
-            <Button variant="ghost" size="icon">
-              <Bell className="h-5 w-5" />
-              {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-destructive px-1 text-xs font-medium text-destructive-foreground">
-                  {unreadCount > 99 ? '99+' : unreadCount}
-                </span>
-              )}
-            </Button>
-          </Link>
+          </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="lg:pl-64">
-        <div className="container py-6 px-4 lg:px-8 max-w-4xl">
+      <main className="min-h-[calc(100vh-65px)] pb-20 lg:pb-8">
+        <div className="p-4 max-w-4xl mx-auto animate-fade-in">
           {children}
         </div>
       </main>
+
+      {/* Bottom Navigation - Mobile Only */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-background border-t lg:hidden z-50">
+        <div className="grid grid-cols-5 gap-1 p-2">
+          {anggotaMenuItems.map((item) => {
+            const isActive = location.pathname === item.path || 
+              (item.path !== '/anggota' && location.pathname.startsWith(item.path));
+            
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={cn(
+                  'flex flex-col items-center justify-center py-2 px-1 rounded-lg transition-colors relative',
+                  isActive
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:bg-muted'
+                )}
+              >
+                <div className="relative">
+                  <item.icon className="h-5 w-5" />
+                  {item.showBadge && unreadCount > 0 && !isActive && (
+                    <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-medium text-destructive-foreground">
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
+                </div>
+                <span className="text-[10px] mt-1 truncate text-center leading-tight">
+                  {item.label}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
+
+      {/* Desktop Bottom Menu Bar */}
+      <nav className="hidden lg:block fixed bottom-0 left-0 right-0 bg-background border-t z-50">
+        <div className="max-w-4xl mx-auto flex items-center justify-center gap-2 p-3">
+          {anggotaMenuItems.map((item) => {
+            const isActive = location.pathname === item.path || 
+              (item.path !== '/anggota' && location.pathname.startsWith(item.path));
+            
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={cn(
+                  'flex items-center gap-2 px-4 py-2 rounded-lg transition-colors relative',
+                  isActive
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:bg-muted'
+                )}
+              >
+                <item.icon className="h-4 w-4" />
+                <span className="text-sm font-medium">{item.label}</span>
+                {item.showBadge && unreadCount > 0 && !isActive && (
+                  <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </Badge>
+                )}
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
 
       {/* Logout Confirmation Dialog */}
       <LogoutConfirmDialog
@@ -247,4 +246,16 @@ export function AnggotaLayout({ children }: AnggotaLayoutProps) {
       />
     </div>
   );
+}
+
+function getPageTitle(pathname: string): string {
+  const titles: Record<string, string> = {
+    '/anggota': 'Beranda',
+    '/anggota/notifikasi': 'Notifikasi',
+    '/anggota/iuran': 'Iuran Saya',
+    '/anggota/riwayat': 'Riwayat',
+    '/anggota/profil': 'Profil',
+  };
+  
+  return titles[pathname] || 'RUKEM';
 }
