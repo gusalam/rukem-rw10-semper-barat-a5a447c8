@@ -10,7 +10,7 @@ import { StatCard } from '@/components/ui/stat-card';
 import { ExportButtons } from '@/components/ui/export-buttons';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Users, Receipt, Wallet, HandHeart, Home, ChevronDown, ChevronRight, Filter } from 'lucide-react';
+import { Users, Receipt, Wallet, HandHeart, Home, ChevronDown, ChevronRight, Filter, BarChart3, FileText } from 'lucide-react';
 import type { Anggota, IuranTagihan, IuranPembayaran, Kas, Santunan } from '@/types/database';
 import { formatCurrency, formatDate, formatPeriode } from '@/lib/format';
 import { exportToPDF, exportToExcel } from '@/lib/export';
@@ -349,47 +349,61 @@ export default function LaporanPage() {
       </div>
 
       <Tabs defaultValue="rekap" className="mt-6">
-        {/* Mobile: Horizontal scrollable quick action buttons */}
-        <div className="overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide">
-          <TabsList className="inline-flex w-max md:w-auto h-auto p-1 gap-1.5 bg-muted/50 rounded-xl">
-            <TabsTrigger 
-              value="rekap" 
-              className="px-3 py-2 text-xs font-medium rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm transition-all"
-            >
-              Rekap
-            </TabsTrigger>
-            <TabsTrigger 
-              value="tagihan-kk" 
-              className="px-3 py-2 text-xs font-medium rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm transition-all"
-            >
-              Per KK
-            </TabsTrigger>
-            <TabsTrigger 
-              value="anggota" 
-              className="px-3 py-2 text-xs font-medium rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm transition-all"
-            >
-              Anggota
-            </TabsTrigger>
-            <TabsTrigger 
-              value="tagihan" 
-              className="px-3 py-2 text-xs font-medium rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm transition-all"
-            >
-              Tagihan
-            </TabsTrigger>
-            <TabsTrigger 
-              value="kas" 
-              className="px-3 py-2 text-xs font-medium rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm transition-all"
-            >
-              Kas
-            </TabsTrigger>
-            <TabsTrigger 
-              value="santunan" 
-              className="px-3 py-2 text-xs font-medium rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm transition-all"
-            >
-              Santunan
-            </TabsTrigger>
-          </TabsList>
-        </div>
+        {/* Mobile: Grid quick action boxes */}
+        <TabsList className="grid grid-cols-3 gap-2 h-auto p-0 bg-transparent md:hidden">
+          <TabsTrigger 
+            value="rekap" 
+            className="flex flex-col items-center justify-center gap-1.5 p-3 h-auto rounded-xl border border-border bg-card data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary shadow-sm transition-all"
+          >
+            <BarChart3 className="h-5 w-5" />
+            <span className="text-xs font-medium">Rekap</span>
+          </TabsTrigger>
+          <TabsTrigger 
+            value="tagihan-kk" 
+            className="flex flex-col items-center justify-center gap-1.5 p-3 h-auto rounded-xl border border-border bg-card data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary shadow-sm transition-all"
+          >
+            <Home className="h-5 w-5" />
+            <span className="text-xs font-medium">Per KK</span>
+          </TabsTrigger>
+          <TabsTrigger 
+            value="anggota" 
+            className="flex flex-col items-center justify-center gap-1.5 p-3 h-auto rounded-xl border border-border bg-card data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary shadow-sm transition-all"
+          >
+            <Users className="h-5 w-5" />
+            <span className="text-xs font-medium">Anggota</span>
+          </TabsTrigger>
+          <TabsTrigger 
+            value="tagihan" 
+            className="flex flex-col items-center justify-center gap-1.5 p-3 h-auto rounded-xl border border-border bg-card data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary shadow-sm transition-all"
+          >
+            <FileText className="h-5 w-5" />
+            <span className="text-xs font-medium">Tagihan</span>
+          </TabsTrigger>
+          <TabsTrigger 
+            value="kas" 
+            className="flex flex-col items-center justify-center gap-1.5 p-3 h-auto rounded-xl border border-border bg-card data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary shadow-sm transition-all"
+          >
+            <Wallet className="h-5 w-5" />
+            <span className="text-xs font-medium">Kas</span>
+          </TabsTrigger>
+          <TabsTrigger 
+            value="santunan" 
+            className="flex flex-col items-center justify-center gap-1.5 p-3 h-auto rounded-xl border border-border bg-card data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary shadow-sm transition-all"
+          >
+            <HandHeart className="h-5 w-5" />
+            <span className="text-xs font-medium">Santunan</span>
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Desktop: Horizontal tabs */}
+        <TabsList className="hidden md:inline-flex h-auto p-1 gap-1 bg-muted/50 rounded-lg">
+          <TabsTrigger value="rekap" className="px-4 py-2 text-sm">Rekap</TabsTrigger>
+          <TabsTrigger value="tagihan-kk" className="px-4 py-2 text-sm">Per KK</TabsTrigger>
+          <TabsTrigger value="anggota" className="px-4 py-2 text-sm">Anggota</TabsTrigger>
+          <TabsTrigger value="tagihan" className="px-4 py-2 text-sm">Tagihan</TabsTrigger>
+          <TabsTrigger value="kas" className="px-4 py-2 text-sm">Kas</TabsTrigger>
+          <TabsTrigger value="santunan" className="px-4 py-2 text-sm">Santunan</TabsTrigger>
+        </TabsList>
 
         <TabsContent value="rekap" className="mt-4">
           <RekapBulanan 
