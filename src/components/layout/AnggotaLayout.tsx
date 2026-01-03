@@ -23,9 +23,9 @@ import {
 
 const anggotaMenuItems = [
   { icon: LayoutDashboard, label: 'Beranda', path: '/anggota' },
-  { icon: Bell, label: 'Notifikasi', path: '/anggota/notifikasi', showBadge: true },
   { icon: Receipt, label: 'Iuran', path: '/anggota/iuran' },
   { icon: History, label: 'Riwayat', path: '/anggota/riwayat' },
+  { icon: Users, label: 'Keluarga', path: '/anggota/keluarga' },
   { icon: User, label: 'Profil', path: '/anggota/profil' },
 ];
 
@@ -191,11 +191,6 @@ export function AnggotaLayout({ children, showBackButton = true, title }: Anggot
               >
                 <div className="relative">
                   <item.icon className="h-5 w-5" />
-                  {item.showBadge && unreadCount > 0 && !isActive && (
-                    <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-medium text-destructive-foreground">
-                      {unreadCount > 99 ? '99+' : unreadCount}
-                    </span>
-                  )}
                 </div>
                 <span className="text-[10px] mt-1 truncate text-center leading-tight">
                   {item.label}
@@ -226,11 +221,6 @@ export function AnggotaLayout({ children, showBackButton = true, title }: Anggot
               >
                 <item.icon className="h-4 w-4" />
                 <span className="text-sm font-medium">{item.label}</span>
-                {item.showBadge && unreadCount > 0 && !isActive && (
-                  <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs">
-                    {unreadCount > 99 ? '99+' : unreadCount}
-                  </Badge>
-                )}
               </Link>
             );
           })}
@@ -253,7 +243,9 @@ function getPageTitle(pathname: string): string {
     '/anggota': 'Beranda',
     '/anggota/notifikasi': 'Notifikasi',
     '/anggota/iuran': 'Iuran Saya',
-    '/anggota/riwayat': 'Riwayat',
+    '/anggota/riwayat': 'Riwayat Pembayaran',
+    '/anggota/keluarga': 'Data Keluarga',
+    '/anggota/santunan': 'Info Santunan',
     '/anggota/profil': 'Profil',
   };
   

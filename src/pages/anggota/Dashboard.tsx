@@ -45,6 +45,20 @@ const quickActions = [
     description: 'Riwayat pembayaran',
   },
   { 
+    icon: Users, 
+    label: 'Keluarga', 
+    path: '/anggota/keluarga',
+    color: 'bg-cyan-500',
+    description: 'Data anggota KK',
+  },
+  { 
+    icon: HandHeart, 
+    label: 'Santunan', 
+    path: '/anggota/santunan',
+    color: 'bg-rose-500',
+    description: 'Info santunan',
+  },
+  { 
     icon: Bell, 
     label: 'Notifikasi', 
     path: '/anggota/notifikasi',
