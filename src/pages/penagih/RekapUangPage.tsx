@@ -394,12 +394,12 @@ export default function RekapUangPage() {
               </div>
               <div className="space-y-2">
                 <Label>Bulan Periode</Label>
-                <Select value={filters.bulan} onValueChange={(v) => setFilters({ ...filters, bulan: v })}>
+                <Select value={filters.bulan || "all"} onValueChange={(v) => setFilters({ ...filters, bulan: v === "all" ? "" : v })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Semua Bulan" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Semua Bulan</SelectItem>
+                    <SelectItem value="all">Semua Bulan</SelectItem>
                     {months.map(m => (
                       <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
                     ))}
@@ -408,12 +408,12 @@ export default function RekapUangPage() {
               </div>
               <div className="space-y-2">
                 <Label>Tahun Periode</Label>
-                <Select value={filters.tahun} onValueChange={(v) => setFilters({ ...filters, tahun: v })}>
+                <Select value={filters.tahun || "all"} onValueChange={(v) => setFilters({ ...filters, tahun: v === "all" ? "" : v })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Pilih Tahun" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Semua Tahun</SelectItem>
+                    <SelectItem value="all">Semua Tahun</SelectItem>
                     {years.map(y => (
                       <SelectItem key={y} value={y}>{y}</SelectItem>
                     ))}
@@ -422,12 +422,12 @@ export default function RekapUangPage() {
               </div>
               <div className="space-y-2">
                 <Label>Status</Label>
-                <Select value={filters.status} onValueChange={(v) => setFilters({ ...filters, status: v })}>
+                <Select value={filters.status || "all"} onValueChange={(v) => setFilters({ ...filters, status: v === "all" ? "" : v })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Semua Status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Semua Status</SelectItem>
+                    <SelectItem value="all">Semua Status</SelectItem>
                     <SelectItem value="menunggu_admin">Menunggu Verifikasi</SelectItem>
                     <SelectItem value="disetujui">Disetujui</SelectItem>
                     <SelectItem value="ditolak">Ditolak</SelectItem>
@@ -436,12 +436,12 @@ export default function RekapUangPage() {
               </div>
               <div className="space-y-2">
                 <Label>Kepala Keluarga</Label>
-                <Select value={filters.noKk} onValueChange={(v) => setFilters({ ...filters, noKk: v })}>
+                <Select value={filters.noKk || "all"} onValueChange={(v) => setFilters({ ...filters, noKk: v === "all" ? "" : v })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Semua KK" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Semua KK</SelectItem>
+                    <SelectItem value="all">Semua KK</SelectItem>
                     {kkOptions.map(kk => (
                       <SelectItem key={kk.no_kk} value={kk.no_kk}>{kk.nama_kk}</SelectItem>
                     ))}
