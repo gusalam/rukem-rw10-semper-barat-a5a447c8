@@ -1,28 +1,72 @@
 import { useEffect, useState, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { AnggotaLayout } from '@/components/layout/AnggotaLayout';
-import { PageHeader } from '@/components/ui/page-header';
-import { StatCard } from '@/components/ui/stat-card';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { DashboardSkeleton } from '@/components/ui/loading-skeleton';
-import { formatCurrency, formatPeriode, formatDate } from '@/lib/format';
-import { Receipt, CheckCircle, Clock, AlertCircle, Wallet, Bell, TrendingUp, Calendar } from 'lucide-react';
-import type { IuranTagihan, Pengaturan, Notifikasi, IuranPembayaran } from '@/types/database';
+import { formatCurrency, formatPeriode } from '@/lib/format';
+import { 
+  Receipt, 
+  CheckCircle, 
+  Clock, 
+  AlertCircle, 
+  Wallet, 
+  Bell, 
+  TrendingUp, 
+  Calendar,
+  Users,
+  History,
+  User,
+  HandHeart,
+  Home,
+} from 'lucide-react';
+import type { IuranTagihan, Pengaturan, IuranPembayaran } from '@/types/database';
 
 interface PembayaranWithTagihan extends IuranPembayaran {
   tagihan?: IuranTagihan;
 }
 
+// Quick action menu items
+const quickActions = [
+  { 
+    icon: Receipt, 
+    label: 'Tagihan Saya', 
+    path: '/anggota/iuran',
+    color: 'bg-blue-500',
+    description: 'Lihat tagihan iuran',
+  },
+  { 
+    icon: History, 
+    label: 'Riwayat', 
+    path: '/anggota/riwayat',
+    color: 'bg-green-500',
+    description: 'Riwayat pembayaran',
+  },
+  { 
+    icon: Bell, 
+    label: 'Notifikasi', 
+    path: '/anggota/notifikasi',
+    color: 'bg-orange-500',
+    description: 'Pemberitahuan',
+  },
+  { 
+    icon: User, 
+    label: 'Profil', 
+    path: '/anggota/profil',
+    color: 'bg-purple-500',
+    description: 'Data diri',
+  },
+];
+
 export default function AnggotaDashboard() {
   const { anggota, user } = useAuth();
   const [tagihanList, setTagihanList] = useState<IuranTagihan[]>([]);
   const [pengaturan, setPengaturan] = useState<Pengaturan | null>(null);
-  const [notifikasi, setNotifikasi] = useState<Notifikasi[]>([]);
   const [saldoKas, setSaldoKas] = useState(0);
   const [totalIuranDibayar, setTotalIuranDibayar] = useState(0);
-  const [riwayatPembayaran, setRiwayatPembayaran] = useState<PembayaranWithTagihan[]>([]);
+  const [unreadNotif, setUnreadNotif] = useState(0);
   const [currentMonthStatus, setCurrentMonthStatus] = useState<'belum_bayar' | 'menunggu_admin' | 'lunas' | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -34,7 +78,7 @@ export default function AnggotaDashboard() {
       const now = new Date();
       const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-      const [settingsRes, tagihanRes, kasRes, notifRes, pembayaranRes] = await Promise.all([
+      const [settingsRes, tagihanRes, kasRes, notifCountRes, pembayaranRes] = await Promise.all([
         supabase.from('pengaturan').select('*').limit(1).maybeSingle(),
         supabase
           .from('iuran_tagihan')
@@ -44,16 +88,14 @@ export default function AnggotaDashboard() {
         supabase.from('kas').select('jenis, nominal'),
         user ? supabase
           .from('notifikasi')
-          .select('*')
+          .select('*', { count: 'exact', head: true })
           .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(5) : Promise.resolve({ data: [] }),
+          .eq('dibaca', false) : Promise.resolve({ count: 0 }),
         // Get all approved payments for this KK
         supabase
           .from('iuran_pembayaran')
           .select('*, iuran_tagihan(*)')
-          .eq('status', 'disetujui')
-          .order('tanggal_bayar', { ascending: false }),
+          .eq('status', 'disetujui'),
       ]);
       
       setPengaturan(settingsRes.data as Pengaturan);
@@ -65,7 +107,7 @@ export default function AnggotaDashboard() {
       const currentMonthTagihan = allTagihan.find(t => t.periode === currentPeriod);
       setCurrentMonthStatus(currentMonthTagihan?.status as any || null);
       
-      setNotifikasi(notifRes.data as Notifikasi[] || []);
+      setUnreadNotif(notifCountRes.count || 0);
       
       // Calculate saldo kas
       const saldo = kasRes.data?.reduce((acc, k) => acc + (k.jenis === 'pemasukan' ? k.nominal : -k.nominal), 0) || 0;
@@ -76,12 +118,7 @@ export default function AnggotaDashboard() {
       const kkTagihanIds = allTagihan.map(t => t.id);
       const kkPembayaran = pembayaranData.filter((p: any) => 
         kkTagihanIds.includes(p.tagihan_id)
-      ).map((p: any) => ({
-        ...p,
-        tagihan: p.iuran_tagihan
-      }));
-      
-      setRiwayatPembayaran(kkPembayaran as PembayaranWithTagihan[]);
+      );
       
       // Calculate total paid
       const totalPaid = kkPembayaran.reduce((sum: number, p: any) => sum + p.nominal, 0);
@@ -99,38 +136,12 @@ export default function AnggotaDashboard() {
     }
   }, [anggota, fetchData]);
 
-  // Real-time subscription untuk notifikasi baru
-  useEffect(() => {
-    if (!user) return;
-
-    const channel = supabase
-      .channel('notifikasi-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'notifikasi',
-          filter: `user_id=eq.${user.id}`,
-        },
-        (payload) => {
-          const newNotif = payload.new as Notifikasi;
-          setNotifikasi(prev => [newNotif, ...prev.slice(0, 4)]);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user]);
-
-  // Real-time subscription untuk tagihan baru
+  // Real-time subscription untuk tagihan
   useEffect(() => {
     if (!anggota) return;
 
     const channel = supabase
-      .channel('tagihan-changes')
+      .channel('anggota-dashboard-changes')
       .on(
         'postgres_changes',
         {
@@ -150,260 +161,245 @@ export default function AnggotaDashboard() {
     };
   }, [anggota, fetchData]);
 
-  const markAsRead = async (notifId: string) => {
-    await supabase.from('notifikasi').update({ dibaca: true }).eq('id', notifId);
-    setNotifikasi(prev => prev.map(n => n.id === notifId ? { ...n, dibaca: true } : n));
-  };
-
   const belumBayar = tagihanList.filter(t => t.status === 'belum_bayar').length;
   const menunggu = tagihanList.filter(t => t.status === 'menunggu_admin').length;
   const lunas = tagihanList.filter(t => t.status === 'lunas').length;
-  const unreadNotif = notifikasi.filter(n => !n.dibaca).length;
 
-  const getCurrentMonthStatusLabel = () => {
-    switch (currentMonthStatus) {
-      case 'belum_bayar':
-        return { label: 'Belum Bayar', variant: 'destructive' as const, icon: AlertCircle };
-      case 'menunggu_admin':
-        return { label: 'Menunggu Verifikasi', variant: 'warning' as const, icon: Clock };
-      case 'lunas':
-        return { label: 'Lunas', variant: 'success' as const, icon: CheckCircle };
-      default:
-        return { label: 'Tidak ada tagihan', variant: 'secondary' as const, icon: Calendar };
-    }
-  };
-
-  const statusInfo = getCurrentMonthStatusLabel();
+  const nominalBelumBayar = tagihanList
+    .filter(t => t.status === 'belum_bayar')
+    .reduce((sum, t) => sum + t.nominal, 0);
 
   if (loading) {
     return (
-      <AnggotaLayout>
-        <PageHeader 
-          title="Memuat..."
-          description="Mohon tunggu sebentar"
-        />
-        <div className="mt-6">
-          <DashboardSkeleton />
+      <AnggotaLayout showBackButton={false}>
+        <div className="space-y-6">
+          <Skeleton className="h-10 w-48" />
+          <div className="grid grid-cols-2 gap-3">
+            {[1, 2, 3, 4].map(i => (
+              <Skeleton key={i} className="h-24 rounded-xl" />
+            ))}
+          </div>
+          <Skeleton className="h-32 rounded-xl" />
         </div>
       </AnggotaLayout>
     );
   }
 
   return (
-    <AnggotaLayout>
-      <PageHeader 
-        title={`Halo, ${anggota?.nama_lengkap?.split(' ')[0] || 'Anggota'}!`}
-        description="Berikut ringkasan keanggotaan Anda"
-      />
+    <AnggotaLayout showBackButton={false}>
+      <div className="space-y-6">
+        {/* Greeting */}
+        <div>
+          <h1 className="text-2xl font-bold">
+            Halo, {anggota?.nama_lengkap?.split(' ')[0] || 'Anggota'}!
+          </h1>
+          <p className="text-muted-foreground text-sm">
+            Berikut ringkasan keanggotaan Anda
+          </p>
+        </div>
 
-      {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mt-6">
-        <StatCard
-          title="Total Iuran Saya"
-          value={formatCurrency(totalIuranDibayar)}
-          icon={TrendingUp}
-          description="Akumulasi iuran yang sudah dibayar"
-          iconClassName="bg-success/10"
-        />
-        <StatCard
-          title="Saldo Kas RUKEM"
-          value={formatCurrency(saldoKas)}
-          icon={Wallet}
-          iconClassName="bg-primary/10"
-        />
-        <StatCard
-          title="Tagihan Belum Bayar"
-          value={belumBayar}
-          icon={AlertCircle}
-          iconClassName="bg-destructive/10"
-        />
-        <StatCard
-          title="Tagihan Lunas"
-          value={lunas}
-          icon={CheckCircle}
-          iconClassName="bg-success/10"
-        />
-      </div>
-
-      {/* Status Iuran Bulan Berjalan */}
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <Calendar className="h-4 w-4" />
-            Status Iuran Bulan Ini
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
-            <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-lg ${
-                currentMonthStatus === 'lunas' ? 'bg-success/10' :
-                currentMonthStatus === 'menunggu_admin' ? 'bg-warning/10' :
-                'bg-destructive/10'
-              }`}>
-                <statusInfo.icon className={`h-5 w-5 ${
-                  currentMonthStatus === 'lunas' ? 'text-success' :
-                  currentMonthStatus === 'menunggu_admin' ? 'text-warning' :
-                  'text-destructive'
-                }`} />
+        {/* Status Iuran Bulan Ini - Prominent */}
+        <Card className={`border-2 ${
+          currentMonthStatus === 'lunas' ? 'border-green-500/50 bg-green-500/5' :
+          currentMonthStatus === 'menunggu_admin' ? 'border-yellow-500/50 bg-yellow-500/5' :
+          'border-red-500/50 bg-red-500/5'
+        }`}>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`p-3 rounded-xl ${
+                  currentMonthStatus === 'lunas' ? 'bg-green-500' :
+                  currentMonthStatus === 'menunggu_admin' ? 'bg-yellow-500' :
+                  'bg-red-500'
+                }`}>
+                  {currentMonthStatus === 'lunas' ? (
+                    <CheckCircle className="h-6 w-6 text-white" />
+                  ) : currentMonthStatus === 'menunggu_admin' ? (
+                    <Clock className="h-6 w-6 text-white" />
+                  ) : (
+                    <AlertCircle className="h-6 w-6 text-white" />
+                  )}
+                </div>
+                <div>
+                  <p className="font-semibold">Iuran {new Date().toLocaleDateString('id-ID', { month: 'long' })}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {currentMonthStatus === 'lunas' ? 'Sudah dibayar' :
+                     currentMonthStatus === 'menunggu_admin' ? 'Menunggu verifikasi' :
+                     'Belum dibayar'}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="font-medium">{new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}</p>
-                <p className="text-sm text-muted-foreground">Status pembayaran bulan ini</p>
-              </div>
+              <StatusBadge status={currentMonthStatus || 'belum_bayar'} />
             </div>
-            <StatusBadge status={currentMonthStatus || 'belum_bayar'} />
+          </CardContent>
+        </Card>
+
+        {/* Quick Stats */}
+        <div className="grid grid-cols-2 gap-3">
+          <Card className="border-green-500/20 bg-gradient-to-br from-green-500/5 to-green-500/10">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-green-500/20">
+                  <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-400" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Total Iuran Saya</p>
+                  <p className="font-bold text-sm">{formatCurrency(totalIuranDibayar)}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-red-500/20 bg-gradient-to-br from-red-500/5 to-red-500/10">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-red-500/20">
+                  <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Belum Bayar</p>
+                  <p className="font-bold text-lg">{belumBayar}</p>
+                  <p className="text-xs text-red-600 dark:text-red-400 font-medium">
+                    {formatCurrency(nominalBelumBayar)}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-yellow-500/20 bg-gradient-to-br from-yellow-500/5 to-yellow-500/10">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-yellow-500/20">
+                  <Clock className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Menunggu</p>
+                  <p className="font-bold text-lg">{menunggu}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-primary/20">
+                  <Wallet className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Kas RUKEM</p>
+                  <p className="font-bold text-sm">{formatCurrency(saldoKas)}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Quick Action Menu Grid */}
+        <div>
+          <h2 className="text-lg font-semibold mb-4">Menu</h2>
+          <div className="grid grid-cols-4 gap-3">
+            {quickActions.map((action) => (
+              <Link key={action.path} to={action.path}>
+                <Card className="hover:shadow-md transition-all active:scale-95 cursor-pointer h-full">
+                  <CardContent className="p-3 flex flex-col items-center justify-center text-center min-h-[90px]">
+                    <div className={`p-2.5 rounded-xl ${action.color} mb-2`}>
+                      <action.icon className="h-5 w-5 text-white" />
+                    </div>
+                    <span className="text-xs font-medium leading-tight">{action.label}</span>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* Notifikasi */}
-      {notifikasi.length > 0 && (
-        <Card className="mt-6">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <Bell className="h-4 w-4" />
-              Notifikasi
-              {unreadNotif > 0 && (
-                <span className="bg-destructive text-destructive-foreground text-xs px-2 py-0.5 rounded-full">
-                  {unreadNotif}
-                </span>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {notifikasi.map((notif) => (
-                <div
-                  key={notif.id}
-                  className={`p-3 rounded-lg border transition-colors cursor-pointer ${
-                    notif.dibaca ? 'bg-card' : 'bg-primary/5 border-primary/20'
-                  }`}
-                  onClick={() => !notif.dibaca && markAsRead(notif.id)}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className={`font-medium text-sm ${!notif.dibaca ? 'text-primary' : ''}`}>
-                        {notif.judul}
-                      </p>
-                      <p className="text-sm text-muted-foreground mt-1">{notif.pesan}</p>
-                    </div>
-                    <span className="text-xs text-muted-foreground whitespace-nowrap">
-                      {formatDate(notif.created_at)}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Riwayat Pembayaran Iuran */}
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle className="text-base font-semibold">Riwayat Pembayaran Iuran</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {riwayatPembayaran.length === 0 ? (
-            <p className="text-center text-muted-foreground py-4">Belum ada riwayat pembayaran</p>
-          ) : (
-            <div className="space-y-3">
-              {riwayatPembayaran.slice(0, 10).map((pembayaran) => (
-                <div
-                  key={pembayaran.id}
-                  className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-success/10">
-                      <CheckCircle className="h-5 w-5 text-success" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-sm">
-                        {pembayaran.tagihan ? formatPeriode(pembayaran.tagihan.periode) : 'Iuran'}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatDate(pembayaran.tanggal_bayar)} • {pembayaran.metode}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-bold text-sm text-success">{formatCurrency(pembayaran.nominal)}</p>
-                    <p className="text-xs text-muted-foreground">Disetujui</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Tagihan Iuran */}
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle className="text-base font-semibold">Tagihan Iuran Terkini</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {tagihanList.length === 0 ? (
-            <p className="text-center text-muted-foreground py-4">Belum ada tagihan iuran</p>
-          ) : (
-            <div className="space-y-3">
-              {tagihanList.map((tagihan) => (
-                <div
-                  key={tagihan.id}
-                  className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10">
-                      <Receipt className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-sm">{formatPeriode(tagihan.periode)}</p>
-                      <p className="text-xs text-muted-foreground">{formatCurrency(tagihan.nominal)}</p>
-                    </div>
-                  </div>
-                  <StatusBadge status={tagihan.status} />
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {pengaturan && (
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle className="text-base font-semibold">Informasi Pembayaran</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            {pengaturan.nama_bank && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Bank</span>
-                <span className="font-medium">{pengaturan.nama_bank}</span>
+        {/* Tagihan Terkini */}
+        {tagihanList.length > 0 && (
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <Receipt className="h-4 w-4 text-primary" />
+                  Tagihan Terkini
+                </h3>
+                <Link to="/anggota/iuran" className="text-xs text-primary font-medium">
+                  Lihat Semua →
+                </Link>
               </div>
-            )}
-            {pengaturan.nomor_rekening && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">No. Rekening</span>
-                <span className="font-medium font-mono">{pengaturan.nomor_rekening}</span>
+              <div className="space-y-3">
+                {tagihanList.slice(0, 3).map((tagihan) => (
+                  <div
+                    key={tagihan.id}
+                    className="flex items-center justify-between p-3 rounded-lg border bg-card"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-lg ${
+                        tagihan.status === 'lunas' ? 'bg-green-500/10' :
+                        tagihan.status === 'menunggu_admin' ? 'bg-yellow-500/10' :
+                        'bg-red-500/10'
+                      }`}>
+                        {tagihan.status === 'lunas' ? (
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                        ) : tagihan.status === 'menunggu_admin' ? (
+                          <Clock className="h-4 w-4 text-yellow-600" />
+                        ) : (
+                          <AlertCircle className="h-4 w-4 text-red-600" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">{formatPeriode(tagihan.periode)}</p>
+                        <p className="text-xs text-muted-foreground">{formatCurrency(tagihan.nominal)}</p>
+                      </div>
+                    </div>
+                    <StatusBadge status={tagihan.status} />
+                  </div>
+                ))}
               </div>
-            )}
-            {pengaturan.nama_pemilik_rekening && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Atas Nama</span>
-                <span className="font-medium">{pengaturan.nama_pemilik_rekening}</span>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Info Pembayaran */}
+        {pengaturan && (
+          <Card className="bg-muted/50">
+            <CardContent className="p-4">
+              <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
+                <Wallet className="h-4 w-4 text-primary" />
+                Info Pembayaran
+              </h3>
+              <div className="space-y-2 text-sm">
+                {pengaturan.nama_bank && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Bank</span>
+                    <span className="font-medium">{pengaturan.nama_bank}</span>
+                  </div>
+                )}
+                {pengaturan.nomor_rekening && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">No. Rekening</span>
+                    <span className="font-medium font-mono">{pengaturan.nomor_rekening}</span>
+                  </div>
+                )}
+                {pengaturan.nama_pemilik_rekening && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Atas Nama</span>
+                    <span className="font-medium">{pengaturan.nama_pemilik_rekening}</span>
+                  </div>
+                )}
+                <div className="flex justify-between pt-2 border-t">
+                  <span className="text-muted-foreground">Nominal Iuran</span>
+                  <span className="font-bold text-primary">{formatCurrency(pengaturan.nominal_iuran)}</span>
+                </div>
               </div>
-            )}
-            <div className="flex justify-between pt-2 border-t">
-              <span className="text-muted-foreground">Nominal Iuran</span>
-              <span className="font-bold text-primary">{formatCurrency(pengaturan.nominal_iuran)}</span>
-            </div>
-            <p className="text-xs text-muted-foreground pt-2">
-              Hubungi penagih wilayah Anda untuk melakukan pembayaran iuran.
-            </p>
-          </CardContent>
-        </Card>
-      )}
+              <p className="text-xs text-muted-foreground mt-3">
+                💡 Hubungi penagih wilayah Anda untuk melakukan pembayaran iuran.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </AnggotaLayout>
   );
 }
