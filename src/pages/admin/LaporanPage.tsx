@@ -349,14 +349,45 @@ export default function LaporanPage() {
       </div>
 
       <Tabs defaultValue="rekap" className="mt-6">
-        <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
-          <TabsList className="inline-flex w-max md:w-auto gap-1">
-            <TabsTrigger value="rekap" className="text-xs sm:text-sm whitespace-nowrap">Rekap</TabsTrigger>
-            <TabsTrigger value="tagihan-kk" className="text-xs sm:text-sm whitespace-nowrap">Per KK</TabsTrigger>
-            <TabsTrigger value="anggota" className="text-xs sm:text-sm whitespace-nowrap">Anggota</TabsTrigger>
-            <TabsTrigger value="tagihan" className="text-xs sm:text-sm whitespace-nowrap">Tagihan</TabsTrigger>
-            <TabsTrigger value="kas" className="text-xs sm:text-sm whitespace-nowrap">Kas</TabsTrigger>
-            <TabsTrigger value="santunan" className="text-xs sm:text-sm whitespace-nowrap">Santunan</TabsTrigger>
+        {/* Mobile: Horizontal scrollable quick action buttons */}
+        <div className="overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide">
+          <TabsList className="inline-flex w-max md:w-auto h-auto p-1 gap-1.5 bg-muted/50 rounded-xl">
+            <TabsTrigger 
+              value="rekap" 
+              className="px-3 py-2 text-xs font-medium rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm transition-all"
+            >
+              Rekap
+            </TabsTrigger>
+            <TabsTrigger 
+              value="tagihan-kk" 
+              className="px-3 py-2 text-xs font-medium rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm transition-all"
+            >
+              Per KK
+            </TabsTrigger>
+            <TabsTrigger 
+              value="anggota" 
+              className="px-3 py-2 text-xs font-medium rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm transition-all"
+            >
+              Anggota
+            </TabsTrigger>
+            <TabsTrigger 
+              value="tagihan" 
+              className="px-3 py-2 text-xs font-medium rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm transition-all"
+            >
+              Tagihan
+            </TabsTrigger>
+            <TabsTrigger 
+              value="kas" 
+              className="px-3 py-2 text-xs font-medium rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm transition-all"
+            >
+              Kas
+            </TabsTrigger>
+            <TabsTrigger 
+              value="santunan" 
+              className="px-3 py-2 text-xs font-medium rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm transition-all"
+            >
+              Santunan
+            </TabsTrigger>
           </TabsList>
         </div>
 
