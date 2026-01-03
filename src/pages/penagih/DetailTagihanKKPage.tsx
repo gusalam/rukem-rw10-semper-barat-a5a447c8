@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -7,9 +7,17 @@ import { PageTransition } from '@/components/ui/page-transition';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { EmptyState } from '@/components/ui/empty-state';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -22,7 +30,6 @@ import {
   ArrowLeft,
   Users,
   Receipt,
-  CreditCard,
   Calendar,
   Phone,
   MapPin,
@@ -30,6 +37,9 @@ import {
   Clock,
   XCircle,
   Banknote,
+  Search,
+  Filter,
+  X,
 } from 'lucide-react';
 import type { Anggota, IuranTagihan, IuranPembayaran } from '@/types/database';
 import { formatCurrency, formatDate, formatPeriode } from '@/lib/format';
@@ -37,6 +47,18 @@ import { formatCurrency, formatDate, formatPeriode } from '@/lib/format';
 interface TagihanWithPembayaran extends IuranTagihan {
   pembayaran?: IuranPembayaran[];
 }
+
+// Generate year options
+const generateYearOptions = () => {
+  const currentYear = new Date().getFullYear();
+  const years: string[] = [];
+  for (let i = currentYear; i >= currentYear - 5; i--) {
+    years.push(i.toString());
+  }
+  return years;
+};
+
+const yearOptions = generateYearOptions();
 
 export default function DetailTagihanKKPage() {
   const { noKK } = useParams<{ noKK: string }>();
@@ -46,6 +68,12 @@ export default function DetailTagihanKKPage() {
   const [kepalaKeluarga, setKepalaKeluarga] = useState<Anggota | null>(null);
   const [anggotaKeluarga, setAnggotaKeluarga] = useState<Anggota[]>([]);
   const [tagihanList, setTagihanList] = useState<TagihanWithPembayaran[]>([]);
+  
+  // Filter states
+  const [searchPeriode, setSearchPeriode] = useState('');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterYear, setFilterYear] = useState<string>('all');
+
   const [stats, setStats] = useState({
     totalTagihan: 0,
     totalLunas: 0,
@@ -333,101 +361,72 @@ export default function DetailTagihanKKPage() {
                 Riwayat Tagihan & Pembayaran
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              {tagihanList.length === 0 ? (
-                <EmptyState
-                  icon={Receipt}
-                  title="Belum Ada Tagihan"
-                  description="Belum ada data tagihan untuk KK ini"
-                />
-              ) : (
-                <div className="space-y-4">
-                  {tagihanList.map((tagihan) => (
-                    <div
-                      key={tagihan.id}
-                      className="border rounded-lg p-4 space-y-3"
-                    >
-                      {/* Tagihan Header */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 rounded-lg bg-muted">
-                            <Calendar className="h-4 w-4 text-muted-foreground" />
-                          </div>
-                          <div>
-                            <p className="font-medium">{formatPeriode(tagihan.periode)}</p>
-                            <p className="text-xs text-muted-foreground">
-                              Jatuh tempo: {formatDate(tagihan.jatuh_tempo)}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-bold">{formatCurrency(tagihan.nominal)}</p>
-                          <StatusBadge status={tagihan.status} />
-                        </div>
-                      </div>
-
-                      {/* Pembayaran List */}
-                      {tagihan.pembayaran && tagihan.pembayaran.length > 0 && (
-                        <div className="ml-4 pl-4 border-l-2 border-muted space-y-2">
-                          <p className="text-xs font-medium text-muted-foreground uppercase">
-                            Riwayat Pembayaran
-                          </p>
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead className="w-[100px]">Tanggal</TableHead>
-                                <TableHead>Nominal</TableHead>
-                                <TableHead>Metode</TableHead>
-                                <TableHead className="text-right">Status</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {tagihan.pembayaran.map((pembayaran) => (
-                                <TableRow key={pembayaran.id}>
-                                  <TableCell className="text-sm">
-                                    {formatDate(pembayaran.tanggal_bayar)}
-                                  </TableCell>
-                                  <TableCell className="font-medium">
-                                    {formatCurrency(pembayaran.nominal)}
-                                  </TableCell>
-                                  <TableCell>
-                                    <span className="capitalize">{pembayaran.metode}</span>
-                                  </TableCell>
-                                  <TableCell className="text-right">
-                                    <div className="flex items-center justify-end gap-2">
-                                      {getStatusIcon(pembayaran.status)}
-                                      <StatusBadge status={pembayaran.status} />
-                                    </div>
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                          {tagihan.pembayaran.some(p => p.alasan_tolak) && (
-                            <div className="text-xs text-red-500">
-                              {tagihan.pembayaran
-                                .filter(p => p.alasan_tolak)
-                                .map(p => (
-                                  <p key={p.id}>Ditolak: {p.alasan_tolak}</p>
-                                ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* No Pembayaran */}
-                      {(!tagihan.pembayaran || tagihan.pembayaran.length === 0) && 
-                       tagihan.status === 'belum_bayar' && (
-                        <div className="ml-4 pl-4 border-l-2 border-muted">
-                          <p className="text-xs text-muted-foreground italic">
-                            Belum ada pembayaran
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+            <CardContent className="space-y-4">
+              {/* Filter Section */}
+              <div className="flex flex-col sm:flex-row gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Cari periode..."
+                    value={searchPeriode}
+                    onChange={(e) => setSearchPeriode(e.target.value)}
+                    className="pl-9"
+                  />
                 </div>
-              )}
+                <div className="flex gap-2">
+                  <div className="relative">
+                    <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
+                    <Select value={filterStatus} onValueChange={setFilterStatus}>
+                      <SelectTrigger className="w-[150px] pl-9">
+                        <SelectValue placeholder="Status" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-popover">
+                        <SelectItem value="all">Semua Status</SelectItem>
+                        <SelectItem value="belum_bayar">Belum Bayar</SelectItem>
+                        <SelectItem value="menunggu_admin">Menunggu</SelectItem>
+                        <SelectItem value="lunas">Lunas</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
+                    <Select value={filterYear} onValueChange={setFilterYear}>
+                      <SelectTrigger className="w-[130px] pl-9">
+                        <SelectValue placeholder="Tahun" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-popover">
+                        <SelectItem value="all">Semua Tahun</SelectItem>
+                        {yearOptions.map(year => (
+                          <SelectItem key={year} value={year}>{year}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {(searchPeriode || filterStatus !== 'all' || filterYear !== 'all') && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        setSearchPeriode('');
+                        setFilterStatus('all');
+                        setFilterYear('all');
+                      }}
+                      title="Reset filter"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {/* Filtered Results */}
+              <FilteredTagihanList
+                tagihanList={tagihanList}
+                searchPeriode={searchPeriode}
+                filterStatus={filterStatus}
+                filterYear={filterYear}
+                getStatusIcon={getStatusIcon}
+              />
             </CardContent>
           </Card>
 
@@ -469,5 +468,151 @@ export default function DetailTagihanKKPage() {
         </div>
       </PageTransition>
     </PenagihLayout>
+  );
+}
+
+// FilteredTagihanList component
+interface FilteredTagihanListProps {
+  tagihanList: TagihanWithPembayaran[];
+  searchPeriode: string;
+  filterStatus: string;
+  filterYear: string;
+  getStatusIcon: (status: string) => React.ReactNode;
+}
+
+function FilteredTagihanList({
+  tagihanList,
+  searchPeriode,
+  filterStatus,
+  filterYear,
+  getStatusIcon,
+}: FilteredTagihanListProps) {
+  const filteredTagihan = useMemo(() => {
+    return tagihanList.filter(tagihan => {
+      // Search by periode
+      const matchesSearch = !searchPeriode || 
+        formatPeriode(tagihan.periode).toLowerCase().includes(searchPeriode.toLowerCase()) ||
+        tagihan.periode.includes(searchPeriode);
+      
+      // Filter by status
+      const matchesStatus = filterStatus === 'all' || tagihan.status === filterStatus;
+      
+      // Filter by year
+      const matchesYear = filterYear === 'all' || tagihan.periode.startsWith(filterYear);
+      
+      return matchesSearch && matchesStatus && matchesYear;
+    });
+  }, [tagihanList, searchPeriode, filterStatus, filterYear]);
+
+  if (tagihanList.length === 0) {
+    return (
+      <EmptyState
+        icon={Receipt}
+        title="Belum Ada Tagihan"
+        description="Belum ada data tagihan untuk KK ini"
+      />
+    );
+  }
+
+  if (filteredTagihan.length === 0) {
+    return (
+      <EmptyState
+        icon={Receipt}
+        title="Tidak Ada Hasil"
+        description="Tidak ada tagihan yang sesuai dengan filter"
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">
+        Menampilkan {filteredTagihan.length} dari {tagihanList.length} tagihan
+      </p>
+      {filteredTagihan.map((tagihan) => (
+        <div
+          key={tagihan.id}
+          className="border rounded-lg p-4 space-y-3"
+        >
+          {/* Tagihan Header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-muted">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="font-medium">{formatPeriode(tagihan.periode)}</p>
+                <p className="text-xs text-muted-foreground">
+                  Jatuh tempo: {formatDate(tagihan.jatuh_tempo)}
+                </p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="font-bold">{formatCurrency(tagihan.nominal)}</p>
+              <StatusBadge status={tagihan.status} />
+            </div>
+          </div>
+
+          {/* Pembayaran List */}
+          {tagihan.pembayaran && tagihan.pembayaran.length > 0 && (
+            <div className="ml-4 pl-4 border-l-2 border-muted space-y-2">
+              <p className="text-xs font-medium text-muted-foreground uppercase">
+                Riwayat Pembayaran
+              </p>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[100px]">Tanggal</TableHead>
+                    <TableHead>Nominal</TableHead>
+                    <TableHead>Metode</TableHead>
+                    <TableHead className="text-right">Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {tagihan.pembayaran.map((pembayaran) => (
+                    <TableRow key={pembayaran.id}>
+                      <TableCell className="text-sm">
+                        {formatDate(pembayaran.tanggal_bayar)}
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {formatCurrency(pembayaran.nominal)}
+                      </TableCell>
+                      <TableCell>
+                        <span className="capitalize">{pembayaran.metode}</span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {getStatusIcon(pembayaran.status)}
+                          <StatusBadge status={pembayaran.status} />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {tagihan.pembayaran.some(p => p.alasan_tolak) && (
+                <div className="text-xs text-red-500">
+                  {tagihan.pembayaran
+                    .filter(p => p.alasan_tolak)
+                    .map(p => (
+                      <p key={p.id}>Ditolak: {p.alasan_tolak}</p>
+                    ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* No Pembayaran */}
+          {(!tagihan.pembayaran || tagihan.pembayaran.length === 0) && 
+           tagihan.status === 'belum_bayar' && (
+            <div className="ml-4 pl-4 border-l-2 border-muted">
+              <p className="text-xs text-muted-foreground italic">
+                Belum ada pembayaran
+              </p>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
   );
 }
