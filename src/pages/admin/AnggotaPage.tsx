@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { AdminLayout } from '@/components/layout/AdminLayout';
@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DataTable } from '@/components/ui/data-table';
+import { TablePagination } from '@/components/ui/table-pagination';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog';
@@ -39,6 +40,7 @@ import { formatPhoneNumber } from '@/lib/format';
 import { getErrorMessage, StandardMessages } from '@/lib/error-messages';
 import { z } from 'zod';
 import { cn } from '@/lib/utils';
+import { useDebounce } from '@/hooks/use-mobile';
 
 const AGAMA_OPTIONS = ['Islam', 'Kristen', 'Katolik', 'Hindu', 'Buddha', 'Konghucu'];
 const STATUS_PERKAWINAN_OPTIONS = ['Belum Kawin', 'Kawin', 'Cerai Hidup', 'Cerai Mati'];
@@ -116,22 +118,50 @@ export default function AnggotaPage() {
   const { toast } = useToast();
   const navigate = useNavigate();
   
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [totalCount, setTotalCount] = useState(0);
+  
+  // Debounced search for server-side filtering
+  const debouncedSearch = useDebounce(search, 300);
+  
   // Real-time validation hook
   const validation = useFormValidation(formData, anggotaSchema);
 
-  useEffect(() => {
-    fetchAnggota();
-  }, []);
-
-  const fetchAnggota = async () => {
+  // Fetch anggota with pagination
+  const fetchAnggota = useCallback(async () => {
+    setLoading(true);
     try {
-      const { data, error } = await supabase
+      // Build query with filters
+      let query = supabase
         .from('anggota')
-        .select('*')
-        .order('nama_lengkap');
+        .select('*', { count: 'exact' });
+      
+      // Apply search filter (server-side)
+      if (debouncedSearch) {
+        query = query.or(
+          `nama_lengkap.ilike.%${debouncedSearch}%,nik.ilike.%${debouncedSearch}%,no_kk.ilike.%${debouncedSearch}%,no_hp.ilike.%${debouncedSearch}%`
+        );
+      }
+      
+      // Apply KK filter
+      if (filterKK) {
+        query = query.eq('no_kk', filterKK);
+      }
+      
+      // Apply pagination
+      const from = (currentPage - 1) * pageSize;
+      const to = from + pageSize - 1;
+      
+      const { data, count, error } = await query
+        .order('nama_lengkap')
+        .range(from, to);
 
       if (error) throw error;
+      
       setAnggotaList(data as Anggota[]);
+      setTotalCount(count || 0);
     } catch (error) {
       console.error('Error fetching anggota:', error);
       toast({
@@ -142,6 +172,58 @@ export default function AnggotaPage() {
     } finally {
       setLoading(false);
     }
+  }, [currentPage, pageSize, debouncedSearch, filterKK, toast]);
+
+  // Fetch unique KK numbers for filter dropdown (separate query)
+  const [uniqueKKNumbers, setUniqueKKNumbers] = useState<string[]>([]);
+  const fetchUniqueKK = useCallback(async () => {
+    const { data } = await supabase
+      .from('anggota')
+      .select('no_kk');
+    if (data) {
+      const unique = [...new Set(data.map(a => a.no_kk))].sort();
+      setUniqueKKNumbers(unique);
+    }
+  }, []);
+
+  // Fetch count of anggota tanpa status
+  const [anggotaTanpaStatus, setAnggotaTanpaStatus] = useState(0);
+  const fetchAnggotaTanpaStatus = useCallback(async () => {
+    const { count } = await supabase
+      .from('anggota')
+      .select('*', { count: 'exact', head: true })
+      .is('status', null);
+    setAnggotaTanpaStatus(count || 0);
+  }, []);
+
+  useEffect(() => {
+    fetchAnggota();
+  }, [fetchAnggota]);
+
+  useEffect(() => {
+    fetchUniqueKK();
+    fetchAnggotaTanpaStatus();
+  }, [fetchUniqueKK, fetchAnggotaTanpaStatus]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch, filterKK]);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1); // Reset to first page
+  };
+
+  // Refresh data after mutations
+  const refreshData = () => {
+    fetchAnggota();
+    fetchUniqueKK();
+    fetchAnggotaTanpaStatus();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -184,7 +266,7 @@ export default function AnggotaPage() {
       }
       setDialogOpen(false);
       resetForm();
-      fetchAnggota();
+      refreshData();
     } catch (error: any) {
       toast({
         variant: 'destructive',
@@ -238,7 +320,7 @@ export default function AnggotaPage() {
       });
       setAccountDialogOpen(false);
       setAccountData({ email: '', password: '' });
-      fetchAnggota();
+      refreshData();
     } catch (error: any) {
       toast({
         variant: 'destructive',
@@ -267,7 +349,7 @@ export default function AnggotaPage() {
       });
       setDeleteDialogOpen(false);
       setSelectedAnggota(null);
-      fetchAnggota();
+      refreshData();
     } catch (error: any) {
       toast({
         variant: 'destructive',
@@ -323,21 +405,8 @@ export default function AnggotaPage() {
     setDeleteDialogOpen(true);
   };
 
-  const filteredAnggota = anggotaList.filter((a) => {
-    const matchesSearch = 
-      a.nama_lengkap.toLowerCase().includes(search.toLowerCase()) ||
-      a.nik.includes(search) ||
-      a.no_kk.includes(search) ||
-      a.no_hp.includes(search);
-    const matchesKK = filterKK ? a.no_kk === filterKK : true;
-    return matchesSearch && matchesKK;
-  });
-
-  // Get unique KK numbers for filter dropdown
-  const uniqueKKNumbers = [...new Set(anggotaList.map(a => a.no_kk))].sort();
-
-  // Hitung anggota tanpa status (untuk fitur perbaikan data)
-  const anggotaTanpaStatus = anggotaList.filter(a => !a.status).length;
+  // Calculate total pages
+  const totalPages = Math.ceil(totalCount / pageSize);
 
   // Full columns for Excel export
   const exportColumnsExcel = [
@@ -376,15 +445,15 @@ export default function AnggotaPage() {
   ];
 
   const handleExportPDF = () => {
-    // Add row numbers
-    const dataWithNo = filteredAnggota.map((item, idx) => ({ ...item, no: idx + 1 }));
+    // Add row numbers - export current page data
+    const dataWithNo = anggotaList.map((item, idx) => ({ ...item, no: (currentPage - 1) * pageSize + idx + 1 }));
     exportToPDF(dataWithNo, exportColumnsPDF, 'Data Anggota RUKEM', 'data-anggota', {
       orientation: 'landscape',
     });
   };
 
   const handleExportExcel = () => {
-    exportToExcel(filteredAnggota, exportColumnsExcel, 'Anggota', 'data-anggota');
+    exportToExcel(anggotaList, exportColumnsExcel, 'Anggota', 'data-anggota');
   };
 
   const columns = [
@@ -471,7 +540,7 @@ export default function AnggotaPage() {
           <ExportButtons
             onExportPDF={handleExportPDF}
             onExportExcel={handleExportExcel}
-            disabled={filteredAnggota.length === 0}
+            disabled={anggotaList.length === 0}
           />
           <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
             <Upload className="h-4 w-4 mr-2" />
@@ -860,14 +929,14 @@ export default function AnggotaPage() {
       <ImportAnggotaDialog
         open={importDialogOpen}
         onOpenChange={setImportDialogOpen}
-        onSuccess={fetchAnggota}
+        onSuccess={refreshData}
       />
 
       {/* Fix Status Dialog */}
       <FixStatusAnggotaDialog
         open={fixStatusDialogOpen}
         onOpenChange={setFixStatusDialogOpen}
-        onSuccess={fetchAnggota}
+        onSuccess={refreshData}
         anggotaTanpaStatus={anggotaTanpaStatus}
       />
 
@@ -953,21 +1022,32 @@ export default function AnggotaPage() {
         {filterKK && (
           <div className="mb-4 p-3 bg-muted/50 rounded-lg">
             <p className="text-sm text-muted-foreground">
-              Menampilkan <span className="font-medium text-foreground">{filteredAnggota.length}</span> anggota dengan No. KK: <span className="font-medium text-foreground">{filterKK}</span>
+              Menampilkan data dengan No. KK: <span className="font-medium text-foreground">{filterKK}</span>
             </p>
           </div>
         )}
 
         {loading ? (
           <AdminAnggotaSkeleton />
-        ) : filteredAnggota.length === 0 ? (
+        ) : anggotaList.length === 0 ? (
           <EmptyState
             icon={Users}
             title="Belum ada anggota"
-            description="Tambahkan anggota baru untuk memulai"
+            description={search || filterKK ? "Tidak ada data yang sesuai dengan filter" : "Tambahkan anggota baru untuk memulai"}
           />
         ) : (
-          <DataTable data={filteredAnggota} columns={columns} />
+          <>
+            <DataTable data={anggotaList} columns={columns} />
+            <TablePagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={totalCount}
+              pageSize={pageSize}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
+              loading={loading}
+            />
+          </>
         )}
       </div>
     </AdminLayout>
