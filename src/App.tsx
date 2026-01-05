@@ -17,6 +17,7 @@ import TagihanPage from "./pages/admin/TagihanPage";
 import PembayaranPage from "./pages/admin/PembayaranPage";
 import PenagihPage from "./pages/admin/PenagihPage";
 import ValidasiDataPage from "./pages/admin/ValidasiDataPage";
+import MigrasiDataPage from "./pages/admin/MigrasiDataPage";
 import AnggotaDashboard from "./pages/anggota/Dashboard";
 import AnggotaNotifikasiPage from "./pages/anggota/NotifikasiPage";
 import AnggotaIuranPage from "./pages/anggota/IuranPage";
@@ -87,6 +88,7 @@ const App = () => (
             <Route path="/admin/santunan" element={<ProtectedRoute requiredRole="admin"><SantunanPage /></ProtectedRoute>} />
             <Route path="/admin/laporan" element={<ProtectedRoute requiredRole="admin"><LaporanPage /></ProtectedRoute>} />
             <Route path="/admin/validasi-data" element={<ProtectedRoute requiredRole="admin"><ValidasiDataPage /></ProtectedRoute>} />
+            <Route path="/admin/migrasi-data" element={<ProtectedRoute requiredRole="admin"><MigrasiDataPage /></ProtectedRoute>} />
             <Route path="/admin/pengaturan" element={<ProtectedRoute requiredRole="admin"><PengaturanPage /></ProtectedRoute>} />
             
             {/* Penagih Routes */}

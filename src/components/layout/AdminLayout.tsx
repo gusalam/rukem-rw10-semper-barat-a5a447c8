@@ -24,6 +24,7 @@ import {
   Menu,
   ChevronRight,
   ShieldCheck,
+  Database,
 } from 'lucide-react';
 
 const adminMenuItems = [
@@ -37,6 +38,7 @@ const adminMenuItems = [
   { icon: HandHeart, label: 'Santunan', href: '/admin/santunan' },
   { icon: FileText, label: 'Laporan', href: '/admin/laporan' },
   { icon: ShieldCheck, label: 'Validasi Data', href: '/admin/validasi-data' },
+  { icon: Database, label: 'Migrasi Data', href: '/admin/migrasi-data' },
   { icon: Settings, label: 'Pengaturan', href: '/admin/pengaturan' },
 ];
 
