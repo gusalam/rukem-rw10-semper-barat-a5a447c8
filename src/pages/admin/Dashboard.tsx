@@ -12,8 +12,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AdminDashboardSkeleton } from '@/components/ui/admin-loading-skeleton';
+import { KKTanpaKepalaWarning } from '@/components/admin/KKTanpaKepalaWarning';
 import { formatCurrency, formatDate, formatPeriode } from '@/lib/format';
-import { Users, Receipt, Wallet, Clock, RefreshCw, Home, TrendingUp, AlertTriangle, ArrowRight } from 'lucide-react';
+import { Users, Receipt, Wallet, Clock, RefreshCw, Home, TrendingUp, AlertTriangle, ArrowRight, Database } from 'lucide-react';
 import type { IuranTagihan, IuranPembayaran, Anggota } from '@/types/database';
 
 interface DashboardStats {
@@ -274,33 +275,49 @@ export default function AdminDashboard() {
         />
       </div>
 
-      {/* Warning: Data Issues */}
-      {(dataIssues.kkTanpaKepala > 0 || dataIssues.anggotaTanpaStatus > 0 || dataIssues.anggotaDataTidakLengkap > 0) && (
+      {/* Warning: KK Tanpa Kepala - dengan aksi langsung */}
+      {dataIssues.kkTanpaKepala > 0 && (
+        <div className="mt-6">
+          <KKTanpaKepalaWarning 
+            kkTanpaKepalaCount={dataIssues.kkTanpaKepala} 
+            onDataChanged={fetchDashboardData}
+          />
+        </div>
+      )}
+
+      {/* Warning: Other Data Issues */}
+      {(dataIssues.anggotaTanpaStatus > 0 || dataIssues.anggotaDataTidakLengkap > 0) && (
         <Alert variant="destructive" className="mt-6">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Ditemukan Data Bermasalah</AlertTitle>
           <AlertDescription className="mt-2">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <ul className="list-disc list-inside text-sm space-y-1">
-                {dataIssues.kkTanpaKepala > 0 && (
-                  <li><span className="font-medium">{dataIssues.kkTanpaKepala} KK</span> tidak memiliki Kepala Keluarga</li>
-                )}
                 {dataIssues.anggotaTanpaStatus > 0 && (
                   <li><span className="font-medium">{dataIssues.anggotaTanpaStatus} anggota</span> tidak memiliki status</li>
                 )}
                 {dataIssues.anggotaDataTidakLengkap > 0 && (
-                  <li><span className="font-medium">{dataIssues.anggotaDataTidakLengkap} anggota</span> memiliki data tidak lengkap</li>
+                  <li><span className="font-medium">{dataIssues.anggotaDataTidakLengkap} anggota</span> memiliki data tidak lengkap (termasuk status_dalam_kk)</li>
                 )}
               </ul>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => navigate('/admin/validasi-data')}
-                className="shrink-0"
-              >
-                Lihat Detail
-                <ArrowRight className="h-4 w-4 ml-2" />
-              </Button>
+              <div className="flex gap-2 shrink-0">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => navigate('/admin/migrasi-data')}
+                >
+                  <Database className="h-4 w-4 mr-2" />
+                  Migrasi Data
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => navigate('/admin/validasi-data')}
+                >
+                  Lihat Detail
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+              </div>
             </div>
           </AlertDescription>
         </Alert>
