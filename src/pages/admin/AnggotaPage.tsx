@@ -43,6 +43,11 @@ import { cn } from '@/lib/utils';
 const AGAMA_OPTIONS = ['Islam', 'Kristen', 'Katolik', 'Hindu', 'Buddha', 'Konghucu'];
 const STATUS_PERKAWINAN_OPTIONS = ['Belum Kawin', 'Kawin', 'Cerai Hidup', 'Cerai Mati'];
 const HUBUNGAN_KK_OPTIONS = ['Kepala Keluarga', 'Istri', 'Anak', 'Orang Tua', 'Anggota Keluarga Lainnya'];
+const STATUS_ANGGOTA_OPTIONS = [
+  { value: 'aktif', label: 'Aktif' },
+  { value: 'nonaktif', label: 'Tidak Aktif' },
+  { value: 'meninggal', label: 'Meninggal' },
+] as const;
 
 const anggotaSchema = z.object({
   nama_lengkap: z.string().min(3, 'Nama minimal 3 karakter'),
@@ -63,6 +68,7 @@ const anggotaSchema = z.object({
   kabupaten_kota: z.string().min(2, 'Kabupaten/Kota wajib diisi'),
   provinsi: z.string().min(2, 'Provinsi wajib diisi'),
   no_hp: z.string().min(10, 'No HP minimal 10 digit'),
+  status: z.enum(['aktif', 'nonaktif', 'meninggal'], { required_error: 'Status anggota wajib diisi' }),
 });
 
 type FormData = z.infer<typeof anggotaSchema>;
@@ -86,6 +92,7 @@ const emptyFormData: FormData = {
   kabupaten_kota: '',
   provinsi: '',
   no_hp: '',
+  status: 'aktif', // Default status untuk anggota baru
 };
 
 export default function AnggotaPage() {
@@ -301,6 +308,7 @@ export default function AnggotaPage() {
       kabupaten_kota: anggota.kabupaten_kota || '',
       provinsi: anggota.provinsi || '',
       no_hp: anggota.no_hp,
+      status: anggota.status || 'aktif',
     });
     setDialogOpen(true);
   };
@@ -812,6 +820,30 @@ export default function AnggotaPage() {
                     placeholder="08xxxxxxxxxx"
                     required
                   />
+                </div>
+              </div>
+
+              {/* Status Keanggotaan */}
+              <div className="space-y-4">
+                <h3 className="font-semibold text-sm text-primary border-b pb-2">STATUS KEANGGOTAAN</h3>
+                <div className="space-y-2">
+                  <Label htmlFor="status">Status Anggota *</Label>
+                  <Select
+                    value={formData.status}
+                    onValueChange={(value: 'aktif' | 'nonaktif' | 'meninggal') => setFormData({ ...formData, status: value })}
+                  >
+                    <SelectTrigger className="bg-background">
+                      <SelectValue placeholder="Pilih Status" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-background z-50">
+                      {STATUS_ANGGOTA_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Status ini menentukan apakah anggota termasuk dalam perhitungan anggota aktif.
+                  </p>
                 </div>
               </div>
 
