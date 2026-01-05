@@ -7,8 +7,11 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { History, Receipt, User, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { History, Receipt, User, CheckCircle, Clock, XCircle, FileText } from 'lucide-react';
 import { formatCurrency, formatPeriode, formatDateTime } from '@/lib/format';
+import { exportToPDF } from '@/lib/export';
+import { toast } from 'sonner';
 
 interface RiwayatPembayaran {
   id: string;
@@ -124,6 +127,48 @@ export default function AnggotaRiwayatPage() {
   const menungguCount = riwayatList.filter(r => r.status === 'menunggu_admin').length;
   const ditolakCount = riwayatList.filter(r => r.status === 'ditolak').length;
 
+  const handleExportPDF = () => {
+    const dataDisetujui = riwayatList.filter(r => r.status === 'disetujui');
+    
+    if (dataDisetujui.length === 0) {
+      toast.error('Tidak ada data pembayaran yang sudah diverifikasi');
+      return;
+    }
+
+    const columns = [
+      { key: 'no', header: 'No' },
+      { key: 'periode', header: 'Periode', format: (v: string) => formatPeriode(v) },
+      { key: 'tanggal_bayar', header: 'Tanggal Bayar', format: (v: string) => formatDateTime(v) },
+      { key: 'nominal', header: 'Nominal', format: (v: number) => formatCurrency(v) },
+      { key: 'metode', header: 'Metode', format: (v: string) => v.toUpperCase() },
+      { key: 'penagih', header: 'Penagih' },
+      { key: 'approved_at', header: 'Tanggal Verifikasi', format: (v: string) => v ? formatDateTime(v) : '-' },
+    ];
+
+    const data = dataDisetujui.map((item, index) => ({
+      no: index + 1,
+      periode: item.tagihan?.periode || '-',
+      tanggal_bayar: item.tanggal_bayar,
+      nominal: item.nominal,
+      metode: item.metode,
+      penagih: item.penagih_profile?.full_name || '-',
+      approved_at: item.approved_at,
+    }));
+
+    const namaAnggota = anggota?.nama_lengkap || 'Anggota';
+    const noKK = anggota?.no_kk || '';
+    
+    exportToPDF(
+      data,
+      columns,
+      `Bukti Riwayat Pembayaran Iuran\n${namaAnggota} (KK: ${noKK})`,
+      `riwayat-pembayaran-${noKK}`,
+      { orientation: 'landscape' }
+    );
+
+    toast.success('PDF berhasil diunduh');
+  };
+
   if (loading) {
     return (
       <AnggotaLayout>
@@ -142,14 +187,26 @@ export default function AnggotaRiwayatPage() {
         {/* Header Card */}
         <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
           <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-full bg-primary/20">
-                <History className="h-8 w-8 text-primary" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-full bg-primary/20">
+                  <History className="h-8 w-8 text-primary" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold">Riwayat Pembayaran</h2>
+                  <p className="text-sm text-muted-foreground">Transaksi iuran dari penagih</p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-xl font-bold">Riwayat Pembayaran</h2>
-                <p className="text-sm text-muted-foreground">Transaksi iuran dari penagih</p>
-              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleExportPDF}
+                disabled={disetujuiCount === 0}
+                className="shrink-0"
+              >
+                <FileText className="h-4 w-4 mr-1" />
+                PDF
+              </Button>
             </div>
           </CardContent>
         </Card>
