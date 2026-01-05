@@ -82,16 +82,19 @@ export default function LaporanPage() {
       const anggota = anggotaRes.data as Anggota[] || [];
       const tagihan = tagihanRes.data as IuranTagihan[] || [];
 
+      // PENTING: Filter hanya anggota aktif untuk perhitungan KK
+      const anggotaAktif = anggota.filter(a => a.status === 'aktif');
+
       setAnggotaList(anggota);
       setTagihanList(tagihan);
       setPembayaranList(pembayaranRes.data as IuranPembayaran[] || []);
       setKasList(kasRes.data as Kas[] || []);
       setSantunanList(santunanRes.data as Santunan[] || []);
 
-      // Build KK Tagihan Report
+      // Build KK Tagihan Report - HANYA dari anggota aktif
       const kkMap = new Map<string, KKTagihanReport>();
       
-      anggota.forEach(a => {
+      anggotaAktif.forEach(a => {
         if (!kkMap.has(a.no_kk)) {
           kkMap.set(a.no_kk, {
             no_kk: a.no_kk,
@@ -151,11 +154,17 @@ export default function LaporanPage() {
     });
   };
 
+  // PENTING: Total KK dihitung dari no_kk unik anggota aktif (sesuai definisi resmi)
   const totalAnggotaAktif = anggotaList.filter(a => a.status === 'aktif').length;
-  const totalKK = kkTagihanReport.length;
+  const totalKK = kkTagihanReport.length; // kkTagihanReport sudah difilter hanya dari anggota aktif
   const totalTagihanLunas = tagihanList.filter(t => t.status === 'lunas').length;
   const saldoKas = kasList.reduce((acc, k) => acc + (k.jenis === 'pemasukan' ? k.nominal : -k.nominal), 0);
   const totalSantunanDisalurkan = santunanList.filter(s => s.status === 'disalurkan').reduce((acc, s) => acc + s.nominal_akhir, 0);
+
+  // Validasi: Hitung KK yang tidak memiliki Kepala Keluarga
+  const kkTanpaKepala = kkTagihanReport.filter(kk => 
+    !kk.anggota_list.some(a => a.hubungan_kk === 'Kepala Keluarga')
+  ).length;
 
   // Export configurations
   const anggotaExportColumns = [
@@ -326,6 +335,7 @@ export default function LaporanPage() {
           title="Total KK"
           value={totalKK}
           icon={Home}
+          description={kkTanpaKepala > 0 ? `${kkTanpaKepala} tanpa Kepala KK` : 'Dari anggota aktif'}
           iconClassName="bg-primary/10"
         />
         <StatCard

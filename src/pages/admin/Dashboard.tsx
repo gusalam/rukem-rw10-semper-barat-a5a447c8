@@ -46,10 +46,12 @@ export default function AdminDashboard() {
         .from('anggota')
         .select('*', { count: 'exact' });
 
-      const anggotaAktif = anggotaData?.filter(a => a.status === 'aktif').length || 0;
+      // Filter anggota aktif
+      const anggotaAktif = anggotaData?.filter(a => a.status === 'aktif') || [];
       
-      // Count unique KK numbers
-      const uniqueKK = new Set(anggotaData?.map(a => a.no_kk) || []);
+      // PENTING: Hitung KK unik HANYA dari anggota dengan status aktif
+      // Tidak bergantung pada hubungan_kk = 'Kepala Keluarga'
+      const uniqueKK = new Set(anggotaAktif.map(a => a.no_kk));
       const totalKK = uniqueKK.size;
 
       // Fetch current month tagihan (per KK)
@@ -86,7 +88,7 @@ export default function AdminDashboard() {
       setStats({
         totalAnggota: totalAnggota || 0,
         totalKK,
-        anggotaAktif,
+        anggotaAktif: anggotaAktif.length,
         totalTagihanBulanIni,
         totalLunas,
         saldoKas,
