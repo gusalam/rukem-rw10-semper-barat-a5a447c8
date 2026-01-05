@@ -245,12 +245,14 @@ export default function AdminDashboard() {
           value={stats.totalAnggota}
           icon={Users}
           description={`${stats.anggotaAktif} aktif`}
+          tooltip="Jumlah semua anggota terdaftar di sistem RUKEM"
         />
         <StatCard
-          title="Total KK"
-          value={stats.totalKK}
+          title="KK Aktif (Valid)"
+          value={stats.totalKK - dataIssues.kkTanpaKepala}
           icon={Home}
-          description="Kartu Keluarga"
+          description="Dapat mengikuti iuran"
+          tooltip="KK yang memiliki Kepala Keluarga terdaftar. Hanya KK ini yang bisa mengikuti iuran dan santunan."
           iconClassName="bg-primary/10"
         />
         <StatCard
@@ -258,12 +260,14 @@ export default function AdminDashboard() {
           value={`${stats.totalLunas}/${stats.totalTagihanBulanIni}`}
           icon={Receipt}
           description="KK lunas dari total tagihan"
+          tooltip="Tagihan dihitung dari KK Aktif (yang memiliki Kepala Keluarga)"
           iconClassName="bg-info/10"
         />
         <StatCard
           title="Saldo Kas"
           value={formatCurrency(stats.saldoKas)}
           icon={Wallet}
+          tooltip="Total saldo kas RUKEM saat ini"
           iconClassName="bg-success/10"
         />
         <StatCard
@@ -271,6 +275,7 @@ export default function AdminDashboard() {
           value={stats.pendingVerifikasi}
           icon={Clock}
           description="Pembayaran perlu diverifikasi"
+          tooltip="Pembayaran yang sudah masuk tapi belum diverifikasi oleh admin"
           iconClassName="bg-warning/10"
         />
       </div>

@@ -89,10 +89,10 @@ export default function TagihanPage() {
         .limit(1)
         .maybeSingle();
 
-      // Map kepala keluarga to tagihan
+      // Map kepala keluarga to tagihan (menggunakan status_dalam_kk)
       const tagihanWithKK = (tagihanData || []).map(tagihan => {
         const kepala = anggotaData?.find(
-          a => a.no_kk === tagihan.no_kk && a.hubungan_kk === 'Kepala Keluarga'
+          a => a.no_kk === tagihan.no_kk && a.status_dalam_kk === 'kepala_keluarga'
         ) || anggotaData?.find(a => a.no_kk === tagihan.no_kk);
         return { ...tagihan, kepala_keluarga: kepala };
       });
@@ -107,11 +107,11 @@ export default function TagihanPage() {
     }
   };
 
-  // Get unique KK list with Kepala Keluarga info
+  // Get unique KK list with Kepala Keluarga info (menggunakan status_dalam_kk)
   const kkList: KKData[] = anggotaList.reduce((acc, anggota) => {
     if (!acc.find(k => k.no_kk === anggota.no_kk)) {
       const kepalaKeluarga = anggotaList.find(
-        a => a.no_kk === anggota.no_kk && a.hubungan_kk === 'Kepala Keluarga'
+        a => a.no_kk === anggota.no_kk && a.status_dalam_kk === 'kepala_keluarga'
       ) || anggota;
       acc.push({
         no_kk: anggota.no_kk,
@@ -449,7 +449,7 @@ export default function TagihanPage() {
 
   return (
     <AdminLayout>
-      <PageHeader title="Tagihan per KK" description="Kelola tagihan iuran per Kartu Keluarga">
+      <PageHeader title="Tagihan per KK" description="Kelola tagihan iuran per Kartu Keluarga. Tagihan dihitung dari KK Aktif (yang memiliki Kepala Keluarga).">
         <div className="flex gap-2">
           <Dialog open={dialogOpen} onOpenChange={(open) => {
             setDialogOpen(open);
