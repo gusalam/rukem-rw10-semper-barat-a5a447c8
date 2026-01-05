@@ -10,6 +10,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog';
 import { ImportAnggotaDialog } from '@/components/admin/ImportAnggotaDialog';
+import { FixStatusAnggotaDialog } from '@/components/admin/FixStatusAnggotaDialog';
 import { AdminAnggotaSkeleton } from '@/components/ui/admin-loading-skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useFormValidation } from '@/components/ui/form-field';
@@ -29,7 +30,7 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Search, Users, Edit, KeyRound, Trash2, Upload, X, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Plus, Search, Users, Edit, KeyRound, Trash2, Upload, X, AlertCircle, CheckCircle2, Wrench } from 'lucide-react';
 import { AvatarUpload } from '@/components/ui/avatar-upload';
 import { ExportButtons } from '@/components/ui/export-buttons';
 import { exportToPDF, exportToExcel } from '@/lib/export';
@@ -96,6 +97,7 @@ export default function AnggotaPage() {
   const [accountDialogOpen, setAccountDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [fixStatusDialogOpen, setFixStatusDialogOpen] = useState(false);
   const [selectedAnggota, setSelectedAnggota] = useState<Anggota | null>(null);
   const [formData, setFormData] = useState<FormData>(emptyFormData);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -326,6 +328,9 @@ export default function AnggotaPage() {
   // Get unique KK numbers for filter dropdown
   const uniqueKKNumbers = [...new Set(anggotaList.map(a => a.no_kk))].sort();
 
+  // Hitung anggota tanpa status (untuk fitur perbaikan data)
+  const anggotaTanpaStatus = anggotaList.filter(a => !a.status).length;
+
   // Full columns for Excel export
   const exportColumnsExcel = [
     { key: 'nama_lengkap', header: 'Nama Lengkap' },
@@ -464,6 +469,12 @@ export default function AnggotaPage() {
             <Upload className="h-4 w-4 mr-2" />
             Import
           </Button>
+          {anggotaTanpaStatus > 0 && (
+            <Button variant="outline" onClick={() => setFixStatusDialogOpen(true)} className="border-warning text-warning hover:bg-warning/10">
+              <Wrench className="h-4 w-4 mr-2" />
+              Perbaiki Data ({anggotaTanpaStatus})
+            </Button>
+          )}
           <Dialog open={dialogOpen} onOpenChange={(open) => {
             setDialogOpen(open);
             if (!open) resetForm();
@@ -818,6 +829,14 @@ export default function AnggotaPage() {
         open={importDialogOpen}
         onOpenChange={setImportDialogOpen}
         onSuccess={fetchAnggota}
+      />
+
+      {/* Fix Status Dialog */}
+      <FixStatusAnggotaDialog
+        open={fixStatusDialogOpen}
+        onOpenChange={setFixStatusDialogOpen}
+        onSuccess={fetchAnggota}
+        anggotaTanpaStatus={anggotaTanpaStatus}
       />
 
       {/* Create Account Dialog */}

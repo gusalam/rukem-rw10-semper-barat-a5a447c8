@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 import {
   Dialog,
   DialogContent,
@@ -45,6 +46,9 @@ const REQUIRED_COLUMNS = [
   'no_hp',
 ];
 
+// Kolom opsional dengan default value
+const OPTIONAL_COLUMNS = ['status'];
+
 const COLUMN_LABELS: Record<string, string> = {
   nama_lengkap: 'Nama Lengkap',
   nik: 'NIK',
@@ -64,7 +68,10 @@ const COLUMN_LABELS: Record<string, string> = {
   kabupaten_kota: 'Kabupaten/Kota',
   provinsi: 'Provinsi',
   no_hp: 'No. HP',
+  status: 'Status Anggota (aktif/nonaktif/meninggal)',
 };
+
+const VALID_STATUS_VALUES = ['aktif', 'nonaktif', 'meninggal'];
 
 const rowSchema = z.object({
   nama_lengkap: z.string().min(3, 'Nama minimal 3 karakter'),
@@ -120,9 +127,12 @@ export function ImportAnggotaDialog({ open, onOpenChange, onSuccess }: ImportAng
   };
 
   const downloadTemplate = () => {
+    // Gabungkan kolom required + optional untuk template
+    const allColumns = [...REQUIRED_COLUMNS, ...OPTIONAL_COLUMNS];
+    
     const ws = XLSX.utils.aoa_to_sheet([
-      REQUIRED_COLUMNS.map(col => COLUMN_LABELS[col]),
-      REQUIRED_COLUMNS.map(col => {
+      allColumns.map(col => COLUMN_LABELS[col]),
+      allColumns.map(col => {
         switch (col) {
           case 'nama_lengkap': return 'John Doe';
           case 'nik': return '3201234567890123';
@@ -142,13 +152,14 @@ export function ImportAnggotaDialog({ open, onOpenChange, onSuccess }: ImportAng
           case 'kabupaten_kota': return 'Kota Contoh';
           case 'provinsi': return 'Jawa Barat';
           case 'no_hp': return '081234567890';
+          case 'status': return 'aktif'; // Default value untuk template
           default: return '';
         }
       }),
     ]);
 
     // Set column widths
-    ws['!cols'] = REQUIRED_COLUMNS.map(() => ({ wch: 25 }));
+    ws['!cols'] = allColumns.map(() => ({ wch: 25 }));
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Template');
@@ -197,6 +208,13 @@ export function ImportAnggotaDialog({ open, onOpenChange, onSuccess }: ImportAng
             errors.push(`${COLUMN_LABELS[col]} kosong`);
           }
         });
+
+        // Handle status column - default ke 'aktif' jika kosong/null/tidak valid
+        if (!normalizedRow.status || !VALID_STATUS_VALUES.includes(normalizedRow.status.toLowerCase())) {
+          normalizedRow.status = 'aktif';
+        } else {
+          normalizedRow.status = normalizedRow.status.toLowerCase();
+        }
 
         // Validate with zod if all fields present
         if (errors.length === 0) {
@@ -334,12 +352,22 @@ export function ImportAnggotaDialog({ open, onOpenChange, onSuccess }: ImportAng
               </Button>
             </div>
 
-            <div className="text-sm">
-              <p className="font-medium mb-2">Kolom yang Dibutuhkan:</p>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-1 text-xs text-muted-foreground">
-                {REQUIRED_COLUMNS.map(col => (
-                  <span key={col}>• {COLUMN_LABELS[col]}</span>
-                ))}
+            <div className="text-sm space-y-3">
+              <div>
+                <p className="font-medium mb-2">Kolom Wajib:</p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-1 text-xs text-muted-foreground">
+                  {REQUIRED_COLUMNS.map(col => (
+                    <span key={col}>• {COLUMN_LABELS[col]}</span>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="font-medium mb-2">Kolom Opsional:</p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-1 text-xs text-muted-foreground">
+                  {OPTIONAL_COLUMNS.map(col => (
+                    <span key={col}>• {COLUMN_LABELS[col]} (default: aktif)</span>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -368,11 +396,12 @@ export function ImportAnggotaDialog({ open, onOpenChange, onSuccess }: ImportAng
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-16">Baris</TableHead>
-                    <TableHead className="w-20">Status</TableHead>
+                    <TableHead className="w-20">Validasi</TableHead>
                     <TableHead>Nama</TableHead>
                     <TableHead>NIK</TableHead>
                     <TableHead>No. KK</TableHead>
                     <TableHead>Hubungan KK</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead>Error</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -391,6 +420,16 @@ export function ImportAnggotaDialog({ open, onOpenChange, onSuccess }: ImportAng
                       <TableCell className="font-mono text-xs">{row.data.nik || '-'}</TableCell>
                       <TableCell className="font-mono text-xs">{row.data.no_kk || '-'}</TableCell>
                       <TableCell>{row.data.hubungan_kk || '-'}</TableCell>
+                      <TableCell>
+                        <span className={cn(
+                          "text-xs px-1.5 py-0.5 rounded",
+                          row.data.status === 'aktif' && "bg-success/10 text-success",
+                          row.data.status === 'nonaktif' && "bg-muted text-muted-foreground",
+                          row.data.status === 'meninggal' && "bg-destructive/10 text-destructive"
+                        )}>
+                          {row.data.status || 'aktif'}
+                        </span>
+                      </TableCell>
                       <TableCell className="text-xs text-destructive max-w-xs truncate">
                         {row.errors.join(', ')}
                       </TableCell>
