@@ -107,19 +107,25 @@ export default function TagihanPage() {
     }
   };
 
-  // Get unique KK list with Kepala Keluarga info (menggunakan status_dalam_kk)
+  // Get unique KK list HANYA yang memiliki Kepala Keluarga (KK Valid)
   const kkList: KKData[] = anggotaList.reduce((acc, anggota) => {
+    // Hanya proses jika belum ada di list
     if (!acc.find(k => k.no_kk === anggota.no_kk)) {
+      // Cari kepala keluarga untuk KK ini
       const kepalaKeluarga = anggotaList.find(
         a => a.no_kk === anggota.no_kk && a.status_dalam_kk === 'kepala_keluarga'
-      ) || anggota;
-      acc.push({
-        no_kk: anggota.no_kk,
-        kepala_keluarga: kepalaKeluarga,
-        anggota_count: anggotaList.filter(a => a.no_kk === anggota.no_kk).length,
-        rt: kepalaKeluarga.rt,
-        rw: kepalaKeluarga.rw,
-      });
+      );
+      
+      // HANYA masukkan KK yang memiliki Kepala Keluarga
+      if (kepalaKeluarga) {
+        acc.push({
+          no_kk: anggota.no_kk,
+          kepala_keluarga: kepalaKeluarga,
+          anggota_count: anggotaList.filter(a => a.no_kk === anggota.no_kk).length,
+          rt: kepalaKeluarga.rt,
+          rw: kepalaKeluarga.rw,
+        });
+      }
     }
     return acc;
   }, [] as KKData[]);
@@ -566,7 +572,7 @@ export default function TagihanPage() {
               </DialogHeader>
               <div className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  Buat tagihan iuran untuk semua KK yang belum memiliki tagihan pada periode tertentu.
+                  Buat tagihan iuran untuk semua <strong>KK Valid</strong> (yang memiliki Kepala Keluarga) yang belum memiliki tagihan pada periode tertentu.
                 </p>
                 <div className="space-y-1.5">
                   <Label>Periode</Label>
@@ -576,9 +582,12 @@ export default function TagihanPage() {
                     onChange={(e) => setPeriode(e.target.value)}
                   />
                 </div>
-                <div className="bg-muted p-3 rounded-lg text-sm">
-                  <p><strong>Total KK:</strong> {kkList.length}</p>
+                <div className="bg-muted p-3 rounded-lg text-sm space-y-1">
+                  <p><strong>KK Valid (punya Kepala):</strong> {kkList.length} KK</p>
                   <p><strong>Nominal per KK:</strong> {formatCurrency(pengaturan?.nominal_iuran || 0)}</p>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    * Tagihan hanya dibuat untuk KK yang sudah memiliki Kepala Keluarga terdaftar
+                  </p>
                 </div>
                 <div className="flex gap-2 justify-end">
                   <Button variant="outline" onClick={() => setGenerateDialogOpen(false)}>
