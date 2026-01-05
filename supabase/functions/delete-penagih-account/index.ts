@@ -85,23 +85,20 @@ serve(async (req) => {
 
     console.log(`Deleting penagih account: user_id=${penagih_user_id}, penagih_id=${penagih_id}`);
 
-    // Check if penagih exists
+    // Check if penagih exists (optional - may already be deleted from previous partial attempt)
     const { data: penagihData, error: penagihError } = await supabaseAdmin
       .from('penagih')
       .select('*')
       .eq('id', penagih_id)
       .maybeSingle();
 
-    if (penagihError || !penagihData) {
-      console.error('Penagih not found:', penagihError);
-      return new Response(JSON.stringify({ error: 'Data penagih tidak ditemukan.' }), {
-        status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    // Store penagih data for audit log (may be null if already deleted)
+    const penagihDataForAudit = penagihData ? { ...penagihData } : { id: penagih_id, user_id: penagih_user_id };
+    const penagihAlreadyDeleted = !penagihData;
+    
+    if (penagihAlreadyDeleted) {
+      console.log('Penagih record already deleted, continuing with auth cleanup...');
     }
-
-    // Store penagih data for audit log before deletion
-    const penagihDataForAudit = { ...penagihData };
 
     // ============================================
     // STEP 1: Delete wilayah assignments
@@ -137,22 +134,26 @@ serve(async (req) => {
     }
 
     // ============================================
-    // STEP 3: Delete penagih record from penagih table
+    // STEP 3: Delete penagih record from penagih table (skip if already deleted)
     // ============================================
-    console.log('Step 3: Deleting penagih record...');
-    const { error: deletePenagihError } = await supabaseAdmin
-      .from('penagih')
-      .delete()
-      .eq('id', penagih_id);
+    if (!penagihAlreadyDeleted) {
+      console.log('Step 3: Deleting penagih record...');
+      const { error: deletePenagihError } = await supabaseAdmin
+        .from('penagih')
+        .delete()
+        .eq('id', penagih_id);
 
-    if (deletePenagihError) {
-      console.error('Delete penagih error:', deletePenagihError);
-      return new Response(JSON.stringify({ error: 'Gagal menghapus data penagih dari database.' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      if (deletePenagihError) {
+        console.error('Delete penagih error:', deletePenagihError);
+        return new Response(JSON.stringify({ error: 'Gagal menghapus data penagih dari database.' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      console.log('Step 3 completed: Penagih record deleted');
+    } else {
+      console.log('Step 3 skipped: Penagih record already deleted');
     }
-    console.log('Step 3 completed: Penagih record deleted');
 
     // ============================================
     // STEP 4: Delete profile record
