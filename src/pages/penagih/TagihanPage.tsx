@@ -92,13 +92,21 @@ export default function PenagihTagihanPage() {
 
       if (!anggotaData) return;
 
-      // Filter by wilayah
+      // Filter by wilayah - hanya ambil Kepala Keluarga dengan RT/RW tidak kosong
       const rtRwPairs = penagihWilayah.map(w => ({ rt: w.rt, rw: w.rw }));
-      const filteredAnggota = anggotaData.filter(a => 
+      
+      // Filter kepala keluarga di wilayah penagih yang memiliki RT/RW lengkap
+      const kepalaKeluargaList = anggotaData.filter(a => 
+        a.status_dalam_kk === 'kepala_keluarga' &&
+        a.rt && a.rw &&
         rtRwPairs.some(pair => pair.rt === a.rt && pair.rw === a.rw)
       );
 
-      const uniqueKKs = [...new Set(filteredAnggota.map(a => a.no_kk))];
+      // Ambil semua anggota dari KK yang memiliki kepala keluarga valid
+      const validKKs = kepalaKeluargaList.map(k => k.no_kk);
+      const filteredAnggota = anggotaData.filter(a => validKKs.includes(a.no_kk));
+      
+      const uniqueKKs = validKKs;
 
       if (uniqueKKs.length === 0) {
         setTagihanList([]);
