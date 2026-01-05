@@ -632,12 +632,22 @@ export default function LaporanPage() {
                     <SelectItem value="meninggal">Meninggal</SelectItem>
                   </SelectContent>
                 </Select>
-                <Badge variant="secondary">
-                  {selectedStatusAnggota === 'all' 
-                    ? anggotaList.length 
-                    : anggotaList.filter(a => a.status === selectedStatusAnggota).length} data
-                </Badge>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="secondary">
+                    {selectedStatusAnggota === 'all' 
+                      ? anggotaList.length 
+                      : anggotaList.filter(a => a.status === selectedStatusAnggota).length} data
+                  </Badge>
+                  {selectedStatusAnggota === 'all' && (
+                    <span className="text-xs text-muted-foreground">
+                      ({anggotaList.filter(a => a.status === 'aktif').length} aktif, {anggotaList.filter(a => a.status === 'nonaktif').length} nonaktif, {anggotaList.filter(a => a.status === 'meninggal').length} meninggal)
+                    </span>
+                  )}
+                </div>
               </div>
+              <p className="text-xs text-muted-foreground">
+                Gunakan filter untuk melihat data per status. Total Anggota = semua data, Anggota Aktif = status aktif.
+              </p>
             </CardHeader>
             <CardContent>
               <DataTable 
