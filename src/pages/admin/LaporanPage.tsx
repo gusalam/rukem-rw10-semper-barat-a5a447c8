@@ -325,11 +325,18 @@ export default function LaporanPage() {
     <AdminLayout>
       <PageHeader title="Laporan" description="Lihat dan cetak laporan RUKEM" />
 
-      <div className="grid gap-4 md:grid-cols-5 mt-6">
+      <div className="grid gap-4 md:grid-cols-6 mt-6">
+        <StatCard
+          title="Total Anggota"
+          value={anggotaList.length}
+          icon={Users}
+          description={`${totalAnggotaAktif} aktif`}
+        />
         <StatCard
           title="Anggota Aktif"
           value={totalAnggotaAktif}
           icon={Users}
+          iconClassName="bg-success/10"
         />
         <StatCard
           title="Total KK"
