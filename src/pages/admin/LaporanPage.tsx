@@ -140,7 +140,7 @@ export default function LaporanPage() {
         }
         const kk = kkMap.get(a.no_kk)!;
         kk.anggota_list.push(a);
-        if (a.hubungan_kk === 'Kepala Keluarga') {
+        if (a.status_dalam_kk === 'kepala_keluarga') {
           kk.kepala_keluarga = a.nama_lengkap;
         }
       });
@@ -193,9 +193,9 @@ export default function LaporanPage() {
   const saldoKas = kasList.reduce((acc, k) => acc + (k.jenis === 'pemasukan' ? k.nominal : -k.nominal), 0);
   const totalSantunanDisalurkan = santunanList.filter(s => s.status === 'disalurkan').reduce((acc, s) => acc + s.nominal_akhir, 0);
 
-  // Validasi: Hitung KK yang tidak memiliki Kepala Keluarga
+  // Validasi: Hitung KK yang tidak memiliki Kepala Keluarga (menggunakan status_dalam_kk)
   const kkTanpaKepala = kkTagihanReport.filter(kk => 
-    !kk.anggota_list.some(a => a.hubungan_kk === 'Kepala Keluarga')
+    !kk.anggota_list.some(a => a.status_dalam_kk === 'kepala_keluarga')
   ).length;
 
   // Export configurations
@@ -345,10 +345,10 @@ export default function LaporanPage() {
     );
   }
 
-  // Map tagihan with kepala keluarga for table display
+  // Map tagihan with kepala keluarga for table display (menggunakan status_dalam_kk)
   const tagihanWithKK = tagihanList.map(t => {
     const kepala = anggotaList.find(
-      a => a.no_kk === t.no_kk && a.hubungan_kk === 'Kepala Keluarga'
+      a => a.no_kk === t.no_kk && a.status_dalam_kk === 'kepala_keluarga'
     ) || anggotaList.find(a => a.no_kk === t.no_kk);
     return { ...t, kepala_keluarga: kepala };
   });

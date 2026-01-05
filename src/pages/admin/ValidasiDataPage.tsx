@@ -81,7 +81,7 @@ export default function ValidasiDataPage() {
     return Array.from(groups.entries()).map(([no_kk, anggota]) => ({
       no_kk,
       anggota,
-      hasKepala: anggota.some(a => a.hubungan_kk === 'Kepala Keluarga' && a.status === 'aktif'),
+      hasKepala: anggota.some(a => a.status_dalam_kk === 'kepala_keluarga' && a.status === 'aktif'),
     }));
   })();
 
@@ -93,8 +93,9 @@ export default function ValidasiDataPage() {
   // Issues
   const kkTanpaKepala = activeKKGroups.filter(kk => !kk.hasKepala);
   const anggotaTanpaStatus = anggotaList.filter(a => !a.status);
+  const anggotaTanpaStatusDalamKK = anggotaList.filter(a => !a.status_dalam_kk);
   const anggotaDataTidakLengkap = anggotaList.filter(a => 
-    !a.nik || !a.no_kk || !a.nama_lengkap || !a.alamat || !a.no_hp || !a.hubungan_kk
+    !a.nik || !a.no_kk || !a.nama_lengkap || !a.alamat || !a.no_hp || !a.status_dalam_kk
   );
 
   const totalIssues = kkTanpaKepala.length + anggotaTanpaStatus.length + anggotaDataTidakLengkap.length;
@@ -139,10 +140,24 @@ export default function ValidasiDataPage() {
     { key: 'nama_lengkap', header: 'Nama Lengkap' },
     { key: 'nik', header: 'NIK' },
     { key: 'no_kk', header: 'No. KK' },
-    { key: 'hubungan_kk', header: 'Hubungan KK' },
+    { key: 'status_dalam_kk', header: 'Status Dalam KK' },
     { key: 'status', header: 'Status' },
     { key: 'masalah', header: 'Masalah' },
   ];
+
+  // Helper for status_dalam_kk label
+  const getStatusDalamKKLabel = (value: string | null) => {
+    if (!value) return '-';
+    const map: Record<string, string> = {
+      'kepala_keluarga': 'Kepala Keluarga',
+      'istri': 'Istri',
+      'anak': 'Anak',
+      'orang_tua': 'Orang Tua',
+      'famili': 'Famili',
+      'lainnya': 'Lainnya',
+    };
+    return map[value] || value;
+  };
 
   const handleExportKKTanpaKepala = (format: 'pdf' | 'excel') => {
     const data = kkTanpaKepala.map((kk, idx) => ({
@@ -151,7 +166,7 @@ export default function ValidasiDataPage() {
       jumlah_anggota: kk.anggota.filter(a => a.status === 'aktif').length,
       anggota_list: kk.anggota
         .filter(a => a.status === 'aktif')
-        .map(a => `${a.nama_lengkap} (${a.hubungan_kk || '-'})`)
+        .map(a => `${a.nama_lengkap} (${getStatusDalamKKLabel(a.status_dalam_kk)})`)
         .join(', '),
     }));
 
@@ -188,14 +203,14 @@ export default function ValidasiDataPage() {
       if (!a.nama_lengkap) masalah.push('Nama kosong');
       if (!a.alamat) masalah.push('Alamat kosong');
       if (!a.no_hp) masalah.push('No HP kosong');
-      if (!a.hubungan_kk) masalah.push('Hubungan KK kosong');
+      if (!a.status_dalam_kk) masalah.push('Status dalam KK kosong');
 
       return {
         no: idx + 1,
         nama_lengkap: a.nama_lengkap || '(kosong)',
         nik: a.nik || '(kosong)',
         no_kk: a.no_kk || '(kosong)',
-        hubungan_kk: a.hubungan_kk || '(kosong)',
+        status_dalam_kk: getStatusDalamKKLabel(a.status_dalam_kk),
         status: a.status || '(kosong)',
         masalah: masalah.join(', '),
       };
@@ -328,11 +343,21 @@ export default function ValidasiDataPage() {
                         <div className="flex flex-wrap gap-1 mt-2">
                           {kk.anggota
                             .filter(a => a.status === 'aktif')
-                            .map(a => (
-                              <Badge key={a.id} variant="secondary" className="text-xs">
-                                {a.nama_lengkap} ({a.hubungan_kk || '-'})
-                              </Badge>
-                            ))}
+                            .map(a => {
+                              const statusLabel = a.status_dalam_kk ? {
+                                'kepala_keluarga': 'Kepala',
+                                'istri': 'Istri',
+                                'anak': 'Anak',
+                                'orang_tua': 'Ortu',
+                                'famili': 'Famili',
+                                'lainnya': 'Lain',
+                              }[a.status_dalam_kk] || a.status_dalam_kk : '-';
+                              return (
+                                <Badge key={a.id} variant="secondary" className="text-xs">
+                                  {a.nama_lengkap} ({statusLabel})
+                                </Badge>
+                              );
+                            })}
                         </div>
                       </div>
                     ))}
@@ -452,7 +477,7 @@ export default function ValidasiDataPage() {
                       if (!a.nama_lengkap) missingFields.push('Nama');
                       if (!a.alamat) missingFields.push('Alamat');
                       if (!a.no_hp) missingFields.push('No HP');
-                      if (!a.hubungan_kk) missingFields.push('Hubungan KK');
+                      if (!a.status_dalam_kk) missingFields.push('Status Dalam KK');
 
                       return (
                         <div 

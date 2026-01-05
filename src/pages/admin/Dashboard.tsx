@@ -78,12 +78,12 @@ export default function AdminDashboard() {
       const totalKK = uniqueKK.size;
 
       // === DETEKSI DATA BERMASALAH ===
-      // Fetch KK dengan Kepala Keluarga untuk validasi
+      // Fetch KK dengan Kepala Keluarga untuk validasi (menggunakan status_dalam_kk)
       const { data: kepalaData } = await supabase
         .from('anggota')
         .select('no_kk')
         .eq('status', 'aktif')
-        .eq('hubungan_kk', 'Kepala Keluarga');
+        .eq('status_dalam_kk', 'kepala_keluarga');
       const kkWithKepala = new Set(kepalaData?.map(a => a.no_kk) || []);
       const kkTanpaKepala = [...uniqueKK].filter(kk => !kkWithKepala.has(kk)).length;
 
@@ -93,12 +93,12 @@ export default function AdminDashboard() {
         .select('*', { count: 'exact', head: true })
         .is('status', null);
 
-      // Count anggota dengan data tidak lengkap
+      // Count anggota dengan data tidak lengkap (termasuk status_dalam_kk)
       const { data: incompleteData } = await supabase
         .from('anggota')
-        .select('id, nik, no_kk, nama_lengkap, alamat, no_hp, hubungan_kk');
+        .select('id, nik, no_kk, nama_lengkap, alamat, no_hp, status_dalam_kk');
       const anggotaDataTidakLengkap = incompleteData?.filter(a => 
-        !a.nik || !a.no_kk || !a.nama_lengkap || !a.alamat || !a.no_hp || !a.hubungan_kk
+        !a.nik || !a.no_kk || !a.nama_lengkap || !a.alamat || !a.no_hp || !a.status_dalam_kk
       ).length || 0;
 
       setDataIssues({

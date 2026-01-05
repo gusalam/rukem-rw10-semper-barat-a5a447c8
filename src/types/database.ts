@@ -37,6 +37,9 @@ export interface Profile {
   updated_at: string;
 }
 
+// Status dalam KK yang valid
+export type StatusDalamKK = 'kepala_keluarga' | 'istri' | 'anak' | 'orang_tua' | 'famili' | 'lainnya';
+
 export interface Anggota {
   id: string;
   user_id: string | null;
@@ -51,7 +54,8 @@ export interface Anggota {
   agama: string | null;
   status_perkawinan: string | null;
   pekerjaan: string | null;
-  hubungan_kk: string | null;
+  hubungan_kk: string | null; // Legacy - keep for backward compat
+  status_dalam_kk: StatusDalamKK | string | null; // New field - primary source (string for DB compat)
   rt: string | null;
   rw: string | null;
   kelurahan: string | null;

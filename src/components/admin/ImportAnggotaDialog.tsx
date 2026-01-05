@@ -35,7 +35,7 @@ const REQUIRED_COLUMNS = [
   'agama',
   'status_perkawinan',
   'pekerjaan',
-  'hubungan_kk',
+  'status_dalam_kk', // New required column
   'alamat',
   'rt',
   'rw',
@@ -59,7 +59,7 @@ const COLUMN_LABELS: Record<string, string> = {
   agama: 'Agama',
   status_perkawinan: 'Status Perkawinan',
   pekerjaan: 'Pekerjaan',
-  hubungan_kk: 'Status dalam KK',
+  status_dalam_kk: 'Status Dalam KK (kepala_keluarga/istri/anak/orang_tua/famili/lainnya)',
   alamat: 'Alamat Lengkap',
   rt: 'RT',
   rw: 'RW',
@@ -72,6 +72,7 @@ const COLUMN_LABELS: Record<string, string> = {
 };
 
 const VALID_STATUS_VALUES = ['aktif', 'nonaktif', 'meninggal'];
+const VALID_STATUS_DALAM_KK = ['kepala_keluarga', 'istri', 'anak', 'orang_tua', 'famili', 'lainnya'];
 
 const rowSchema = z.object({
   nama_lengkap: z.string().min(3, 'Nama minimal 3 karakter'),
@@ -83,7 +84,9 @@ const rowSchema = z.object({
   agama: z.string().min(1, 'Agama wajib diisi'),
   status_perkawinan: z.string().min(1, 'Status perkawinan wajib diisi'),
   pekerjaan: z.string().min(2, 'Pekerjaan wajib diisi'),
-  hubungan_kk: z.string().min(1, 'Status dalam KK wajib diisi'),
+  status_dalam_kk: z.enum(['kepala_keluarga', 'istri', 'anak', 'orang_tua', 'famili', 'lainnya'], { 
+    errorMap: () => ({ message: 'Status dalam KK harus: kepala_keluarga, istri, anak, orang_tua, famili, atau lainnya' }) 
+  }),
   alamat: z.string().min(5, 'Alamat wajib diisi'),
   rt: z.string().min(1, 'RT wajib diisi'),
   rw: z.string().min(1, 'RW wajib diisi'),
@@ -143,7 +146,7 @@ export function ImportAnggotaDialog({ open, onOpenChange, onSuccess }: ImportAng
           case 'agama': return 'Islam';
           case 'status_perkawinan': return 'Kawin';
           case 'pekerjaan': return 'Wiraswasta';
-          case 'hubungan_kk': return 'Kepala Keluarga';
+          case 'status_dalam_kk': return 'kepala_keluarga'; // New field
           case 'alamat': return 'Jl. Contoh No. 123';
           case 'rt': return '001';
           case 'rw': return '002';
@@ -152,14 +155,14 @@ export function ImportAnggotaDialog({ open, onOpenChange, onSuccess }: ImportAng
           case 'kabupaten_kota': return 'Kota Contoh';
           case 'provinsi': return 'Jawa Barat';
           case 'no_hp': return '081234567890';
-          case 'status': return 'aktif'; // Default value untuk template
+          case 'status': return 'aktif';
           default: return '';
         }
       }),
     ]);
 
     // Set column widths
-    ws['!cols'] = allColumns.map(() => ({ wch: 25 }));
+    ws['!cols'] = allColumns.map(() => ({ wch: 30 }));
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Template');
@@ -214,6 +217,15 @@ export function ImportAnggotaDialog({ open, onOpenChange, onSuccess }: ImportAng
           normalizedRow.status = 'aktif';
         } else {
           normalizedRow.status = normalizedRow.status.toLowerCase();
+        }
+
+        // Handle status_dalam_kk - normalize to lowercase
+        if (normalizedRow.status_dalam_kk) {
+          normalizedRow.status_dalam_kk = normalizedRow.status_dalam_kk.toLowerCase().replace(/\s+/g, '_');
+          // Validate value
+          if (!VALID_STATUS_DALAM_KK.includes(normalizedRow.status_dalam_kk)) {
+            errors.push(`Status dalam KK "${normalizedRow.status_dalam_kk}" tidak valid. Gunakan: kepala_keluarga, istri, anak, orang_tua, famili, lainnya`);
+          }
         }
 
         // Validate with zod if all fields present
@@ -400,7 +412,7 @@ export function ImportAnggotaDialog({ open, onOpenChange, onSuccess }: ImportAng
                     <TableHead>Nama</TableHead>
                     <TableHead>NIK</TableHead>
                     <TableHead>No. KK</TableHead>
-                    <TableHead>Hubungan KK</TableHead>
+                    <TableHead>Status Dalam KK</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Error</TableHead>
                   </TableRow>
@@ -419,7 +431,7 @@ export function ImportAnggotaDialog({ open, onOpenChange, onSuccess }: ImportAng
                       <TableCell className="font-medium">{row.data.nama_lengkap || '-'}</TableCell>
                       <TableCell className="font-mono text-xs">{row.data.nik || '-'}</TableCell>
                       <TableCell className="font-mono text-xs">{row.data.no_kk || '-'}</TableCell>
-                      <TableCell>{row.data.hubungan_kk || '-'}</TableCell>
+                      <TableCell>{row.data.status_dalam_kk || '-'}</TableCell>
                       <TableCell>
                         <span className={cn(
                           "text-xs px-1.5 py-0.5 rounded",

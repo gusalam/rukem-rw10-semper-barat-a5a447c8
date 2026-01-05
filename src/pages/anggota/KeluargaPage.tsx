@@ -36,16 +36,16 @@ export default function AnggotaKeluargaPage() {
         .from('anggota')
         .select('*')
         .eq('no_kk', anggota.no_kk)
-        .order('hubungan_kk', { ascending: true });
+        .order('status_dalam_kk', { ascending: true });
 
       // Sort: Kepala Keluarga first, then others
       const sorted = (data || []).sort((a, b) => {
-        if (a.hubungan_kk === 'Kepala Keluarga') return -1;
-        if (b.hubungan_kk === 'Kepala Keluarga') return 1;
+        if (a.status_dalam_kk === 'kepala_keluarga') return -1;
+        if (b.status_dalam_kk === 'kepala_keluarga') return 1;
         return a.nama_lengkap.localeCompare(b.nama_lengkap);
       });
 
-      setKeluargaList(sorted);
+      setKeluargaList(sorted as any);
     } catch (error) {
       console.error('Error fetching keluarga:', error);
     } finally {
@@ -65,7 +65,7 @@ export default function AnggotaKeluargaPage() {
     return keluargaList.filter((member) =>
       member.nama_lengkap.toLowerCase().includes(query) ||
       member.nik.includes(query) ||
-      member.hubungan_kk?.toLowerCase().includes(query) ||
+      member.status_dalam_kk?.toLowerCase().includes(query) ||
       member.pekerjaan?.toLowerCase().includes(query)
     );
   }, [keluargaList, searchQuery]);
@@ -184,9 +184,16 @@ export default function AnggotaKeluargaPage() {
                           )}
                         </div>
                         <div className="flex flex-wrap gap-2 mt-1">
-                          {member.hubungan_kk && (
+                          {member.status_dalam_kk && (
                             <Badge variant="outline" className="text-xs">
-                              {member.hubungan_kk}
+                              {{
+                                'kepala_keluarga': 'Kepala Keluarga',
+                                'istri': 'Istri',
+                                'anak': 'Anak',
+                                'orang_tua': 'Orang Tua',
+                                'famili': 'Famili',
+                                'lainnya': 'Lainnya',
+                              }[member.status_dalam_kk] || member.status_dalam_kk}
                             </Badge>
                           )}
                           {getStatusBadge(member.status)}
