@@ -171,6 +171,23 @@ serve(async (req) => {
     }
 
     // ============================================
+    // STEP 4.5: Nullify penagih_user_id in iuran_pembayaran
+    // (Keep transaction data for audit, but remove user reference)
+    // ============================================
+    console.log('Step 4.5: Nullifying penagih references in iuran_pembayaran...');
+    const { error: nullifyPembayaranError } = await supabaseAdmin
+      .from('iuran_pembayaran')
+      .update({ penagih_user_id: null })
+      .eq('penagih_user_id', penagih_user_id);
+
+    if (nullifyPembayaranError) {
+      console.error('Nullify pembayaran error:', nullifyPembayaranError);
+      // Continue - will try to delete auth user anyway
+    } else {
+      console.log('Step 4.5 completed: Pembayaran references nullified');
+    }
+
+    // ============================================
     // STEP 5: Delete from Supabase Auth (PERMANENT)
     // ============================================
     console.log('Step 5: Deleting from Supabase Auth...');

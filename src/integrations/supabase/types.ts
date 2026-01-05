@@ -145,7 +145,7 @@ export type Database = {
           id: string
           metode: Database["public"]["Enums"]["metode_pembayaran"]
           nominal: number
-          penagih_user_id: string
+          penagih_user_id: string | null
           status: Database["public"]["Enums"]["status_pembayaran_tagihan"]
           tagihan_id: string
           tanggal_bayar: string
@@ -161,7 +161,7 @@ export type Database = {
           id?: string
           metode?: Database["public"]["Enums"]["metode_pembayaran"]
           nominal: number
-          penagih_user_id: string
+          penagih_user_id?: string | null
           status?: Database["public"]["Enums"]["status_pembayaran_tagihan"]
           tagihan_id: string
           tanggal_bayar?: string
@@ -177,7 +177,7 @@ export type Database = {
           id?: string
           metode?: Database["public"]["Enums"]["metode_pembayaran"]
           nominal?: number
-          penagih_user_id?: string
+          penagih_user_id?: string | null
           status?: Database["public"]["Enums"]["status_pembayaran_tagihan"]
           tagihan_id?: string
           tanggal_bayar?: string
