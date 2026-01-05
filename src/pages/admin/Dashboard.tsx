@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useMultiRealtime } from '@/hooks/use-realtime';
 import { AdminLayout } from '@/components/layout/AdminLayout';
@@ -8,10 +9,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DataTable } from '@/components/ui/data-table';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AdminDashboardSkeleton } from '@/components/ui/admin-loading-skeleton';
 import { formatCurrency, formatDate, formatPeriode } from '@/lib/format';
-import { Users, Receipt, Wallet, Clock, RefreshCw, Home, TrendingUp } from 'lucide-react';
-import type { IuranTagihan, IuranPembayaran } from '@/types/database';
+import { Users, Receipt, Wallet, Clock, RefreshCw, Home, TrendingUp, AlertTriangle, ArrowRight } from 'lucide-react';
+import type { IuranTagihan, IuranPembayaran, Anggota } from '@/types/database';
 
 interface DashboardStats {
   totalAnggota: number;
@@ -21,6 +24,12 @@ interface DashboardStats {
   totalLunas: number;
   saldoKas: number;
   pendingVerifikasi: number;
+}
+
+interface DataIssues {
+  kkTanpaKepala: number;
+  anggotaTanpaStatus: number;
+  anggotaDataTidakLengkap: number;
 }
 
 export default function AdminDashboard() {
@@ -35,9 +44,15 @@ export default function AdminDashboard() {
   });
   const [pendingPayments, setPendingPayments] = useState<IuranPembayaran[]>([]);
   const [recentTagihan, setRecentTagihan] = useState<IuranTagihan[]>([]);
+  const [dataIssues, setDataIssues] = useState<DataIssues>({
+    kkTanpaKepala: 0,
+    anggotaTanpaStatus: 0,
+    anggotaDataTidakLengkap: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [isLive, setIsLive] = useState(false);
+  const navigate = useNavigate();
 
   const fetchDashboardData = useCallback(async () => {
     try {
@@ -53,6 +68,29 @@ export default function AdminDashboard() {
       // Tidak bergantung pada hubungan_kk = 'Kepala Keluarga'
       const uniqueKK = new Set(anggotaAktif.map(a => a.no_kk));
       const totalKK = uniqueKK.size;
+
+      // === DETEKSI DATA BERMASALAH ===
+      // 1. KK tanpa Kepala Keluarga
+      const kkWithKepala = new Set(
+        anggotaAktif
+          .filter(a => a.hubungan_kk === 'Kepala Keluarga')
+          .map(a => a.no_kk)
+      );
+      const kkTanpaKepala = [...uniqueKK].filter(kk => !kkWithKepala.has(kk)).length;
+
+      // 2. Anggota tanpa status
+      const anggotaTanpaStatus = anggotaData?.filter(a => !a.status).length || 0;
+
+      // 3. Anggota dengan data tidak lengkap (cek field penting)
+      const anggotaDataTidakLengkap = anggotaData?.filter(a => 
+        !a.nik || !a.no_kk || !a.nama_lengkap || !a.alamat || !a.no_hp || !a.hubungan_kk
+      ).length || 0;
+
+      setDataIssues({
+        kkTanpaKepala,
+        anggotaTanpaStatus,
+        anggotaDataTidakLengkap,
+      });
 
       // Fetch current month tagihan (per KK)
       const currentMonth = new Date().toISOString().slice(0, 7);
@@ -220,6 +258,38 @@ export default function AdminDashboard() {
           iconClassName="bg-warning/10"
         />
       </div>
+
+      {/* Warning: Data Issues */}
+      {(dataIssues.kkTanpaKepala > 0 || dataIssues.anggotaTanpaStatus > 0 || dataIssues.anggotaDataTidakLengkap > 0) && (
+        <Alert variant="destructive" className="mt-6">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Ditemukan Data Bermasalah</AlertTitle>
+          <AlertDescription className="mt-2">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <ul className="list-disc list-inside text-sm space-y-1">
+                {dataIssues.kkTanpaKepala > 0 && (
+                  <li><span className="font-medium">{dataIssues.kkTanpaKepala} KK</span> tidak memiliki Kepala Keluarga</li>
+                )}
+                {dataIssues.anggotaTanpaStatus > 0 && (
+                  <li><span className="font-medium">{dataIssues.anggotaTanpaStatus} anggota</span> tidak memiliki status</li>
+                )}
+                {dataIssues.anggotaDataTidakLengkap > 0 && (
+                  <li><span className="font-medium">{dataIssues.anggotaDataTidakLengkap} anggota</span> memiliki data tidak lengkap</li>
+                )}
+              </ul>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => navigate('/admin/validasi-data')}
+                className="shrink-0"
+              >
+                Lihat Detail
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="grid gap-6 md:grid-cols-2 mt-6">
         <Card>
