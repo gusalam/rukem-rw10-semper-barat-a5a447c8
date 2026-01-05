@@ -444,16 +444,73 @@ export default function AnggotaPage() {
     { key: 'status', header: 'Status' },
   ];
 
+  // Export state
+  const [exporting, setExporting] = useState(false);
+
+  // Fetch all data for export (without pagination limit)
+  const fetchAllAnggotaForExport = async (): Promise<Anggota[]> => {
+    const { data, error } = await supabase
+      .from('anggota')
+      .select('*')
+      .order('nama_lengkap');
+    
+    if (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Gagal Mengambil Data',
+        description: 'Tidak dapat mengambil semua data untuk export.',
+      });
+      return [];
+    }
+    return data as Anggota[];
+  };
+
   const handleExportPDF = () => {
-    // Add row numbers - export current page data
+    // Export current page data
     const dataWithNo = anggotaList.map((item, idx) => ({ ...item, no: (currentPage - 1) * pageSize + idx + 1 }));
-    exportToPDF(dataWithNo, exportColumnsPDF, 'Data Anggota RUKEM', 'data-anggota', {
+    exportToPDF(dataWithNo, exportColumnsPDF, 'Data Anggota RUKEM (Halaman ' + currentPage + ')', 'data-anggota', {
       orientation: 'landscape',
     });
   };
 
   const handleExportExcel = () => {
-    exportToExcel(anggotaList, exportColumnsExcel, 'Anggota', 'data-anggota');
+    // Export current page data
+    exportToExcel(anggotaList, exportColumnsExcel, 'Anggota', 'data-anggota-halaman-' + currentPage);
+  };
+
+  const handleExportAllPDF = async () => {
+    setExporting(true);
+    try {
+      const allData = await fetchAllAnggotaForExport();
+      if (allData.length === 0) return;
+      
+      const dataWithNo = allData.map((item, idx) => ({ ...item, no: idx + 1 }));
+      exportToPDF(dataWithNo, exportColumnsPDF, 'Data Anggota RUKEM (Semua Data)', 'data-anggota-lengkap', {
+        orientation: 'landscape',
+      });
+      toast({
+        title: '✓ Export Berhasil',
+        description: `${allData.length.toLocaleString('id-ID')} data anggota berhasil diexport ke PDF.`,
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleExportAllExcel = async () => {
+    setExporting(true);
+    try {
+      const allData = await fetchAllAnggotaForExport();
+      if (allData.length === 0) return;
+      
+      exportToExcel(allData, exportColumnsExcel, 'Anggota', 'data-anggota-lengkap');
+      toast({
+        title: '✓ Export Berhasil',
+        description: `${allData.length.toLocaleString('id-ID')} data anggota berhasil diexport ke Excel.`,
+      });
+    } finally {
+      setExporting(false);
+    }
   };
 
   const columns = [
@@ -540,7 +597,10 @@ export default function AnggotaPage() {
           <ExportButtons
             onExportPDF={handleExportPDF}
             onExportExcel={handleExportExcel}
-            disabled={anggotaList.length === 0}
+            onExportAllPDF={handleExportAllPDF}
+            onExportAllExcel={handleExportAllExcel}
+            disabled={anggotaList.length === 0 && totalCount === 0}
+            loading={exporting}
           />
           <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
             <Upload className="h-4 w-4 mr-2" />
