@@ -12,6 +12,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog';
 import { ImportAnggotaDialog } from '@/components/admin/ImportAnggotaDialog';
 import { FixStatusAnggotaDialog } from '@/components/admin/FixStatusAnggotaDialog';
+import { GantiKepalaKKDialog } from '@/components/admin/GantiKepalaKKDialog';
 import { AdminAnggotaSkeleton } from '@/components/ui/admin-loading-skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useFormValidation } from '@/components/ui/form-field';
@@ -31,7 +32,7 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Search, Users, Edit, KeyRound, Trash2, Upload, X, AlertCircle, CheckCircle2, Wrench } from 'lucide-react';
+import { Plus, Search, Users, Edit, KeyRound, Trash2, Upload, X, AlertCircle, CheckCircle2, Wrench, UserCog } from 'lucide-react';
 import { AvatarUpload } from '@/components/ui/avatar-upload';
 import { ExportButtons } from '@/components/ui/export-buttons';
 import { exportToPDF, exportToExcel } from '@/lib/export';
@@ -119,7 +120,9 @@ export default function AnggotaPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [fixStatusDialogOpen, setFixStatusDialogOpen] = useState(false);
+  const [gantiKepalaDialogOpen, setGantiKepalaDialogOpen] = useState(false);
   const [selectedAnggota, setSelectedAnggota] = useState<Anggota | null>(null);
+  const [selectedKepalaForChange, setSelectedKepalaForChange] = useState<Anggota | null>(null);
   const [formData, setFormData] = useState<FormData>(emptyFormData);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [accountData, setAccountData] = useState({
@@ -417,6 +420,11 @@ export default function AnggotaPage() {
     setDeleteDialogOpen(true);
   };
 
+  const openGantiKepalaDialog = (anggota: Anggota) => {
+    setSelectedKepalaForChange(anggota);
+    setGantiKepalaDialogOpen(true);
+  };
+
   // Calculate total pages
   const totalPages = Math.ceil(totalCount / pageSize);
 
@@ -623,6 +631,20 @@ export default function AnggotaPage() {
       header: '',
       cell: (item: Anggota) => (
         <div className="flex gap-1">
+          {/* Tombol Ganti Kepala KK - hanya tampil untuk Kepala Keluarga */}
+          {item.status_dalam_kk === 'kepala_keluarga' && (
+            <Button
+              variant="ghost"
+              size="icon"
+              title="Ganti Kepala Keluarga"
+              onClick={(e) => {
+                e.stopPropagation();
+                openGantiKepalaDialog(item);
+              }}
+            >
+              <UserCog className="h-4 w-4 text-primary" />
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon"
@@ -1171,6 +1193,16 @@ export default function AnggotaPage() {
           </>
         )}
       </div>
+
+      {/* Dialog Ganti Kepala Keluarga */}
+      {selectedKepalaForChange && (
+        <GantiKepalaKKDialog
+          open={gantiKepalaDialogOpen}
+          onOpenChange={setGantiKepalaDialogOpen}
+          currentKepala={selectedKepalaForChange}
+          onSuccess={refreshData}
+        />
+      )}
     </AdminLayout>
   );
 }
