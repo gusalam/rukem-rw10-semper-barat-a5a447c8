@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { PenagihLayout } from '@/components/layout/PenagihLayout';
-import { PageHeader } from '@/components/ui/page-header';
-import { DataTable } from '@/components/ui/data-table';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Search, Users, MapPin } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Search, Users, MapPin, Phone } from 'lucide-react';
 import type { Anggota } from '@/types/database';
 
 export default function PenagihAnggotaPage() {
@@ -34,7 +34,6 @@ export default function PenagihAnggotaPage() {
         .order('nama_lengkap');
 
       if (data) {
-        // Filter by penagih wilayah
         const rtRwPairs = penagihWilayah.map(w => ({ rt: w.rt, rw: w.rw }));
         const filtered = data.filter(a => 
           rtRwPairs.some(pair => pair.rt === a.rt && pair.rw === a.rw)
@@ -54,75 +53,64 @@ export default function PenagihAnggotaPage() {
     a.nik.includes(search)
   );
 
-  const columns = [
-    {
-      key: 'nama',
-      header: 'Nama',
-      cell: (item: Anggota) => (
-        <div className="flex items-center gap-3">
-          <Avatar className="h-8 w-8">
-            <AvatarImage src={item.avatar_url || undefined} />
-            <AvatarFallback>{item.nama_lengkap.slice(0, 2).toUpperCase()}</AvatarFallback>
-          </Avatar>
-          <div>
-            <p className="font-medium">{item.nama_lengkap}</p>
-            <p className="text-xs text-muted-foreground">{item.hubungan_kk || '-'}</p>
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: 'no_kk',
-      header: 'No. KK',
-      cell: (item: Anggota) => item.no_kk,
-    },
-    {
-      key: 'alamat',
-      header: 'RT/RW',
-      cell: (item: Anggota) => `RT ${item.rt || '-'} / RW ${item.rw || '-'}`,
-    },
-    {
-      key: 'no_hp',
-      header: 'No. HP',
-      cell: (item: Anggota) => item.no_hp,
-      className: 'hidden md:table-cell',
-    },
-  ];
+  // Group by KK
+  const groupedByKK = filteredAnggota.reduce((acc, anggota) => {
+    if (!acc[anggota.no_kk]) {
+      acc[anggota.no_kk] = [];
+    }
+    acc[anggota.no_kk].push(anggota);
+    return acc;
+  }, {} as Record<string, Anggota[]>);
+
+  const uniqueKKCount = Object.keys(groupedByKK).length;
 
   if (loading) {
     return (
-      <PenagihLayout>
-        <div className="space-y-6">
-          <Skeleton className="h-10 w-48" />
-          <Skeleton className="h-64" />
+      <PenagihLayout title="Anggota Wilayah">
+        <div className="space-y-4">
+          <Skeleton className="h-32 w-full rounded-xl" />
+          <Skeleton className="h-10 w-full rounded-xl" />
+          <Skeleton className="h-24 w-full rounded-xl" />
+          <Skeleton className="h-24 w-full rounded-xl" />
         </div>
       </PenagihLayout>
     );
   }
 
   return (
-    <PenagihLayout>
-      <PageHeader 
-        title="Anggota Wilayah" 
-        description="Daftar anggota di wilayah Anda"
-      />
+    <PenagihLayout title="Anggota Wilayah">
+      <div className="space-y-4">
+        {/* Header Card */}
+        <Card className="bg-gradient-to-br from-cyan-500/10 to-cyan-500/5 border-cyan-500/20">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 rounded-full bg-cyan-500/20">
+                <Users className="h-8 w-8 text-cyan-600 dark:text-cyan-400" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold">Anggota Wilayah</h2>
+                <p className="text-sm text-muted-foreground">{uniqueKKCount} KK • {filteredAnggota.length} anggota</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-      {penagihWilayah.length === 0 ? (
-        <EmptyState
-          icon={MapPin}
-          title="Belum Ada Wilayah"
-          description="Anda belum ditugaskan ke wilayah manapun"
-        />
-      ) : anggotaList.length === 0 ? (
-        <EmptyState
-          icon={Users}
-          title="Tidak Ada Anggota"
-          description="Belum ada anggota di wilayah Anda"
-        />
-      ) : (
-        <>
-          <div className="flex items-center gap-2 mb-4">
-            <div className="relative flex-1 max-w-sm">
+        {penagihWilayah.length === 0 ? (
+          <EmptyState
+            icon={MapPin}
+            title="Belum Ada Wilayah"
+            description="Anda belum ditugaskan ke wilayah manapun"
+          />
+        ) : anggotaList.length === 0 ? (
+          <EmptyState
+            icon={Users}
+            title="Tidak Ada Anggota"
+            description="Belum ada anggota di wilayah Anda"
+          />
+        ) : (
+          <>
+            {/* Search */}
+            <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Cari nama, NIK, atau No. KK..."
@@ -131,15 +119,56 @@ export default function PenagihAnggotaPage() {
                 className="pl-9"
               />
             </div>
-          </div>
 
-          <DataTable
-            columns={columns}
-            data={filteredAnggota}
-            emptyMessage="Tidak ada anggota yang cocok dengan pencarian"
-          />
-        </>
-      )}
+            {/* Anggota List */}
+            <div className="space-y-3">
+              {filteredAnggota.length === 0 ? (
+                <EmptyState
+                  icon={Users}
+                  title="Tidak Ditemukan"
+                  description="Tidak ada anggota yang cocok dengan pencarian"
+                />
+              ) : (
+                filteredAnggota.map((item) => (
+                  <Card key={item.id}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-12 w-12 shrink-0">
+                          <AvatarImage src={item.avatar_url || undefined} />
+                          <AvatarFallback className="bg-primary/10 text-primary">
+                            {item.nama_lengkap.slice(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{item.nama_lengkap}</p>
+                          <p className="text-xs text-muted-foreground">KK: {item.no_kk}</p>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            <Badge variant="outline" className="text-xs">
+                              {item.hubungan_kk || '-'}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground flex items-center gap-1">
+                              <MapPin className="h-3 w-3" />
+                              RT {item.rt || '-'}/RW {item.rw || '-'}
+                            </span>
+                          </div>
+                        </div>
+                        {item.no_hp && (
+                          <a 
+                            href={`tel:${item.no_hp}`}
+                            className="p-2 rounded-full bg-primary/10 text-primary shrink-0"
+                          >
+                            <Phone className="h-4 w-4" />
+                          </a>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
+          </>
+        )}
+      </div>
     </PenagihLayout>
   );
 }

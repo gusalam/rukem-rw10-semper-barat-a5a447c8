@@ -2,15 +2,12 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { PenagihLayout } from '@/components/layout/PenagihLayout';
-import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { DataTable } from '@/components/ui/data-table';
 import { EmptyState } from '@/components/ui/empty-state';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { ExportButtons } from '@/components/ui/export-buttons';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
@@ -19,7 +16,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Receipt, Filter, X, TrendingUp } from 'lucide-react';
+import { 
+  Receipt, 
+  Filter, 
+  X, 
+  TrendingUp, 
+  Wallet, 
+  Clock, 
+  FileText,
+  ChevronDown,
+  ChevronUp
+} from 'lucide-react';
 import { formatCurrency, formatDate, formatPeriode } from '@/lib/format';
 import { exportToPDF, exportToExcel } from '@/lib/export';
 import { toast } from 'sonner';
@@ -42,7 +49,6 @@ export default function RekapUangPage() {
   const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
 
-  // Filter states
   const [filters, setFilters] = useState({
     tanggalMulai: '',
     tanggalAkhir: '',
@@ -78,7 +84,6 @@ export default function RekapUangPage() {
     try {
       const rtRwPairs = penagihWilayah.map(w => ({ rt: w.rt, rw: w.rw }));
       
-      // Get anggota in penagih wilayah
       const { data: anggotaData } = await supabase
         .from('anggota')
         .select('id, no_kk, rt, rw, nama_lengkap, hubungan_kk')
@@ -90,7 +95,6 @@ export default function RekapUangPage() {
 
       const uniqueKKs = [...new Set(filteredAnggota.map(a => a.no_kk))];
 
-      // Build KK options
       const kkOpts: KKOption[] = uniqueKKs.map(kk => {
         const kepala = filteredAnggota.find(a => a.no_kk === kk && a.hubungan_kk === 'Kepala Keluarga')
           || filteredAnggota.find(a => a.no_kk === kk);
@@ -98,14 +102,12 @@ export default function RekapUangPage() {
       });
       setKkOptions(kkOpts);
 
-      // Fetch pembayaran by this penagih
       let query = supabase
         .from('iuran_pembayaran')
         .select('*, iuran_tagihan(*)')
         .eq('penagih_user_id', user.id)
         .order('tanggal_bayar', { ascending: false });
 
-      // Apply filters
       if (filters.tanggalMulai) {
         query = query.gte('tanggal_bayar', filters.tanggalMulai);
       }
@@ -123,7 +125,6 @@ export default function RekapUangPage() {
         return;
       }
 
-      // Process and filter data
       let processedData: PembayaranWithDetails[] = (pembayaranData || []).map((p: any) => {
         const tagihan = p.iuran_tagihan as IuranTagihan;
         const kepala = tagihan ? filteredAnggota.find(a => 
@@ -136,7 +137,6 @@ export default function RekapUangPage() {
         };
       });
 
-      // Filter by bulan & tahun (from periode)
       if (filters.bulan || filters.tahun) {
         processedData = processedData.filter(p => {
           if (!p.tagihan?.periode) return true;
@@ -147,7 +147,6 @@ export default function RekapUangPage() {
         });
       }
 
-      // Filter by KK
       if (filters.noKk) {
         processedData = processedData.filter(p => p.tagihan?.no_kk === filters.noKk);
       }
@@ -184,21 +183,10 @@ export default function RekapUangPage() {
     }
   };
 
-  const getStatusVariant = (status: string) => {
-    switch (status) {
-      case 'menunggu_admin': return 'warning';
-      case 'disetujui': return 'success';
-      case 'ditolak': return 'destructive';
-      default: return 'secondary';
-    }
-  };
-
-  // Calculate totals
   const totalSemua = pembayaranList.reduce((sum, p) => sum + p.nominal, 0);
   const totalDisetujui = pembayaranList.filter(p => p.status === 'disetujui').reduce((sum, p) => sum + p.nominal, 0);
   const totalMenunggu = pembayaranList.filter(p => p.status === 'menunggu_admin').reduce((sum, p) => sum + p.nominal, 0);
 
-  // Export functions
   const exportColumns = [
     { key: 'no', header: 'No' },
     { key: 'nama_kk', header: 'Nama KK' },
@@ -244,234 +232,208 @@ export default function RekapUangPage() {
     toast.success('Berhasil export ke Excel');
   };
 
-  const columns = [
-    {
-      key: 'nama_kk',
-      header: 'Nama KK',
-      cell: (item: PembayaranWithDetails) => (
-        <div>
-          <p className="font-medium text-sm">{item.kepala_keluarga?.nama_lengkap || '-'}</p>
-          <p className="text-xs text-muted-foreground">KK: {item.tagihan?.no_kk || '-'}</p>
-        </div>
-      ),
-    },
-    {
-      key: 'periode',
-      header: 'Periode',
-      cell: (item: PembayaranWithDetails) => item.tagihan?.periode ? formatPeriode(item.tagihan.periode) : '-',
-      className: 'hidden sm:table-cell',
-    },
-    {
-      key: 'tanggal_bayar',
-      header: 'Tanggal Bayar',
-      cell: (item: PembayaranWithDetails) => formatDate(item.tanggal_bayar),
-      className: 'hidden md:table-cell',
-    },
-    {
-      key: 'nominal',
-      header: 'Nominal',
-      cell: (item: PembayaranWithDetails) => (
-        <span className="font-medium">{formatCurrency(item.nominal)}</span>
-      ),
-    },
-    {
-      key: 'status',
-      header: 'Status',
-      cell: (item: PembayaranWithDetails) => (
-        <StatusBadge 
-          status={getStatusLabel(item.status)} 
-          variant={getStatusVariant(item.status) as any} 
-        />
-      ),
-    },
-  ];
-
   if (loading) {
     return (
-      <PenagihLayout>
-        <div className="space-y-6">
-          <Skeleton className="h-10 w-48" />
-          <Skeleton className="h-32" />
-          <Skeleton className="h-64" />
+      <PenagihLayout title="Rekap Uang">
+        <div className="space-y-4">
+          <Skeleton className="h-32 w-full rounded-xl" />
+          <div className="grid grid-cols-3 gap-2">
+            {[1, 2, 3].map(i => <Skeleton key={i} className="h-20 rounded-xl" />)}
+          </div>
+          <Skeleton className="h-24 w-full rounded-xl" />
         </div>
       </PenagihLayout>
     );
   }
 
   return (
-    <PenagihLayout>
-      <PageHeader 
-        title="Rekap Uang" 
-        description="Rekap pembayaran yang Anda input"
-      >
-        <ExportButtons 
-          onExportPDF={handleExportPDF}
-          onExportExcel={handleExportExcel}
-          disabled={pembayaranList.length === 0}
-        />
-      </PageHeader>
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <Card>
+    <PenagihLayout title="Rekap Uang">
+      <div className="space-y-4">
+        {/* Header Card */}
+        <Card className="bg-gradient-to-br from-purple-500/10 to-purple-500/5 border-purple-500/20">
           <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <TrendingUp className="h-5 w-5 text-primary" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-full bg-purple-500/20">
+                  <Wallet className="h-8 w-8 text-purple-600 dark:text-purple-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold">Rekap Uang</h2>
+                  <p className="text-sm text-muted-foreground">{pembayaranList.length} pembayaran</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Total Disetujui</p>
-                <p className="text-xl font-bold text-success">{formatCurrency(totalDisetujui)}</p>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={handleExportPDF} disabled={pembayaranList.length === 0}>
+                  <FileText className="h-4 w-4 mr-1" />
+                  PDF
+                </Button>
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-warning/10 rounded-lg">
-                <Receipt className="h-5 w-5 text-warning" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Menunggu Verifikasi</p>
-                <p className="text-xl font-bold text-warning">{formatCurrency(totalMenunggu)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-muted rounded-lg">
-                <Receipt className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Total Semua</p>
-                <p className="text-xl font-bold">{formatCurrency(totalSemua)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
 
-      {/* Filters */}
-      <Card className="mb-6">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Filter className="h-4 w-4" />
-              Filter Data
-            </CardTitle>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={resetFilters}>
-                <X className="h-4 w-4 mr-1" />
-                Reset
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => setShowFilters(!showFilters)}>
-                {showFilters ? 'Sembunyikan' : 'Tampilkan'}
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        {showFilters && (
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label>Tanggal Mulai</Label>
-                <Input
-                  type="date"
-                  value={filters.tanggalMulai}
-                  onChange={(e) => setFilters({ ...filters, tanggalMulai: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Tanggal Akhir</Label>
-                <Input
-                  type="date"
-                  value={filters.tanggalAkhir}
-                  onChange={(e) => setFilters({ ...filters, tanggalAkhir: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Bulan Periode</Label>
-                <Select value={filters.bulan || "all"} onValueChange={(v) => setFilters({ ...filters, bulan: v === "all" ? "" : v })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Semua Bulan" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Semua Bulan</SelectItem>
-                    {months.map(m => (
-                      <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Tahun Periode</Label>
-                <Select value={filters.tahun || "all"} onValueChange={(v) => setFilters({ ...filters, tahun: v === "all" ? "" : v })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih Tahun" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Semua Tahun</SelectItem>
-                    {years.map(y => (
-                      <SelectItem key={y} value={y}>{y}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Status</Label>
-                <Select value={filters.status || "all"} onValueChange={(v) => setFilters({ ...filters, status: v === "all" ? "" : v })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Semua Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Semua Status</SelectItem>
-                    <SelectItem value="menunggu_admin">Menunggu Verifikasi</SelectItem>
-                    <SelectItem value="disetujui">Disetujui</SelectItem>
-                    <SelectItem value="ditolak">Ditolak</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Kepala Keluarga</Label>
-                <Select value={filters.noKk || "all"} onValueChange={(v) => setFilters({ ...filters, noKk: v === "all" ? "" : v })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Semua KK" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Semua KK</SelectItem>
-                    {kkOptions.map(kk => (
-                      <SelectItem key={kk.no_kk} value={kk.no_kk}>{kk.nama_kk}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </CardContent>
-        )}
-      </Card>
+        {/* Summary Cards */}
+        <div className="grid grid-cols-3 gap-2">
+          <Card className="bg-success/5 border-success/20">
+            <CardContent className="p-3 text-center">
+              <TrendingUp className="h-5 w-5 text-success mx-auto" />
+              <p className="text-sm font-bold text-success mt-1">{formatCurrency(totalDisetujui)}</p>
+              <p className="text-[10px] text-muted-foreground">Disetujui</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-warning/5 border-warning/20">
+            <CardContent className="p-3 text-center">
+              <Clock className="h-5 w-5 text-warning mx-auto" />
+              <p className="text-sm font-bold text-warning mt-1">{formatCurrency(totalMenunggu)}</p>
+              <p className="text-[10px] text-muted-foreground">Menunggu</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-muted/50">
+            <CardContent className="p-3 text-center">
+              <Receipt className="h-5 w-5 text-muted-foreground mx-auto" />
+              <p className="text-sm font-bold mt-1">{formatCurrency(totalSemua)}</p>
+              <p className="text-[10px] text-muted-foreground">Total</p>
+            </CardContent>
+          </Card>
+        </div>
 
-      {/* Data Table */}
-      {pembayaranList.length === 0 ? (
-        <EmptyState
-          icon={Receipt}
-          title="Tidak Ada Data"
-          description="Tidak ada data pembayaran yang sesuai dengan filter."
-        />
-      ) : (
+        {/* Filters */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">
-              Daftar Pembayaran ({pembayaranList.length} data)
-            </CardTitle>
+          <CardHeader className="py-3">
+            <Button 
+              variant="ghost" 
+              className="w-full flex items-center justify-between p-0 h-auto"
+              onClick={() => setShowFilters(!showFilters)}
+            >
+              <CardTitle className="text-base flex items-center gap-2">
+                <Filter className="h-4 w-4" />
+                Filter Data
+              </CardTitle>
+              {showFilters ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </Button>
           </CardHeader>
-          <CardContent>
-            <DataTable columns={columns} data={pembayaranList} />
-          </CardContent>
+          {showFilters && (
+            <CardContent className="space-y-4 pt-0">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Tanggal Mulai</Label>
+                  <Input
+                    type="date"
+                    value={filters.tanggalMulai}
+                    onChange={(e) => setFilters({ ...filters, tanggalMulai: e.target.value })}
+                    className="h-9"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Tanggal Akhir</Label>
+                  <Input
+                    type="date"
+                    value={filters.tanggalAkhir}
+                    onChange={(e) => setFilters({ ...filters, tanggalAkhir: e.target.value })}
+                    className="h-9"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Bulan</Label>
+                  <Select value={filters.bulan || "all"} onValueChange={(v) => setFilters({ ...filters, bulan: v === "all" ? "" : v })}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Semua" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua Bulan</SelectItem>
+                      {months.map(m => (
+                        <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Tahun</Label>
+                  <Select value={filters.tahun || "all"} onValueChange={(v) => setFilters({ ...filters, tahun: v === "all" ? "" : v })}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Semua" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua Tahun</SelectItem>
+                      {years.map(y => (
+                        <SelectItem key={y} value={y}>{y}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Status</Label>
+                  <Select value={filters.status || "all"} onValueChange={(v) => setFilters({ ...filters, status: v === "all" ? "" : v })}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Semua" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua Status</SelectItem>
+                      <SelectItem value="menunggu_admin">Menunggu</SelectItem>
+                      <SelectItem value="disetujui">Disetujui</SelectItem>
+                      <SelectItem value="ditolak">Ditolak</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Kepala KK</Label>
+                  <Select value={filters.noKk || "all"} onValueChange={(v) => setFilters({ ...filters, noKk: v === "all" ? "" : v })}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Semua" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua KK</SelectItem>
+                      {kkOptions.map(kk => (
+                        <SelectItem key={kk.no_kk} value={kk.no_kk}>{kk.nama_kk}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <Button variant="outline" size="sm" onClick={resetFilters} className="w-full">
+                <X className="h-4 w-4 mr-1" />
+                Reset Filter
+              </Button>
+            </CardContent>
+          )}
         </Card>
-      )}
+
+        {/* Pembayaran List */}
+        <div className="space-y-3">
+          {pembayaranList.length === 0 ? (
+            <EmptyState
+              icon={Receipt}
+              title="Tidak Ada Data"
+              description="Tidak ada data pembayaran yang sesuai dengan filter."
+            />
+          ) : (
+            pembayaranList.map((item) => (
+              <Card key={item.id}>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-start gap-3 flex-1 min-w-0">
+                      <div className="p-2 rounded-lg bg-primary/10 shrink-0">
+                        <Receipt className="h-5 w-5 text-primary" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium truncate">{item.kepala_keluarga?.nama_lengkap || '-'}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {item.tagihan ? formatPeriode(item.tagihan.periode) : '-'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{formatDate(item.tanggal_bayar)}</p>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0 ml-2">
+                      <p className="font-bold text-primary">{formatCurrency(item.nominal)}</p>
+                      <StatusBadge status={item.status} />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+      </div>
     </PenagihLayout>
   );
 }
