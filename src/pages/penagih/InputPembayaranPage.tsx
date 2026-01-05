@@ -166,10 +166,12 @@ export default function InputPembayaranPage() {
 
       if (tagihanError) throw tagihanError;
 
+      // Optimistic update: langsung hapus item dari list
+      setTagihanList(prev => prev.filter(t => t.id !== selectedTagihan.id));
+      
       toast.success('Pembayaran berhasil diinput, menunggu verifikasi admin');
       setDialogOpen(false);
       setSelectedTagihan(null);
-      fetchData();
     } catch (error: any) {
       console.error('Error submitting payment:', error);
       toast.error(error.message || 'Gagal menyimpan pembayaran');
