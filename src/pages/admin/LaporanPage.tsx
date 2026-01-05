@@ -38,6 +38,14 @@ export default function LaporanPage() {
   const [loading, setLoading] = useState(true);
   const [selectedPeriode, setSelectedPeriode] = useState<string>('all');
   const [selectedStatusAnggota, setSelectedStatusAnggota] = useState<string>('all');
+  
+  // State untuk COUNT langsung dari database (tidak terbatas limit 1000)
+  const [countStats, setCountStats] = useState({
+    totalAnggota: 0,
+    anggotaAktif: 0,
+    anggotaNonaktif: 0,
+    anggotaMeninggal: 0,
+  });
 
   // Generate available periods from tagihan data
   const availablePeriodes = useMemo(() => {
@@ -72,13 +80,36 @@ export default function LaporanPage() {
 
   const fetchData = async () => {
     try {
-      const [anggotaRes, tagihanRes, pembayaranRes, kasRes, santunanRes] = await Promise.all([
+      // === QUERY COUNT LANGSUNG DARI DATABASE (tidak terbatas limit 1000) ===
+      const [
+        totalAnggotaRes,
+        anggotaAktifRes,
+        anggotaNonaktifRes,
+        anggotaMeninggalRes,
+        anggotaRes, 
+        tagihanRes, 
+        pembayaranRes, 
+        kasRes, 
+        santunanRes
+      ] = await Promise.all([
+        supabase.from('anggota').select('*', { count: 'exact', head: true }),
+        supabase.from('anggota').select('*', { count: 'exact', head: true }).eq('status', 'aktif'),
+        supabase.from('anggota').select('*', { count: 'exact', head: true }).eq('status', 'nonaktif'),
+        supabase.from('anggota').select('*', { count: 'exact', head: true }).eq('status', 'meninggal'),
         supabase.from('anggota').select('*').order('nama_lengkap'),
         supabase.from('iuran_tagihan').select('*').order('jatuh_tempo', { ascending: false }),
         supabase.from('iuran_pembayaran').select('*, tagihan:iuran_tagihan(*)').order('created_at', { ascending: false }),
         supabase.from('kas').select('*').order('created_at', { ascending: false }),
         supabase.from('santunan').select('*, anggota(*), kematian(*)').order('created_at', { ascending: false }),
       ]);
+
+      // Set count stats dari database (akurat, tidak terbatas limit)
+      setCountStats({
+        totalAnggota: totalAnggotaRes.count || 0,
+        anggotaAktif: anggotaAktifRes.count || 0,
+        anggotaNonaktif: anggotaNonaktifRes.count || 0,
+        anggotaMeninggal: anggotaMeninggalRes.count || 0,
+      });
 
       const anggota = anggotaRes.data as Anggota[] || [];
       const tagihan = tagihanRes.data as IuranTagihan[] || [];
@@ -155,8 +186,8 @@ export default function LaporanPage() {
     });
   };
 
-  // PENTING: Total KK dihitung dari no_kk unik anggota aktif (sesuai definisi resmi)
-  const totalAnggotaAktif = anggotaList.filter(a => a.status === 'aktif').length;
+  // PENTING: Gunakan countStats dari database untuk statistik (akurat, tidak terbatas limit 1000)
+  // totalKK dihitung dari no_kk unik anggota aktif
   const totalKK = kkTagihanReport.length; // kkTagihanReport sudah difilter hanya dari anggota aktif
   const totalTagihanLunas = tagihanList.filter(t => t.status === 'lunas').length;
   const saldoKas = kasList.reduce((acc, k) => acc + (k.jenis === 'pemasukan' ? k.nominal : -k.nominal), 0);
@@ -329,13 +360,13 @@ export default function LaporanPage() {
       <div className="grid gap-4 md:grid-cols-6 mt-6">
         <StatCard
           title="Total Anggota"
-          value={anggotaList.length}
+          value={countStats.totalAnggota}
           icon={Users}
-          description={`${totalAnggotaAktif} aktif`}
+          description={`${countStats.anggotaAktif} aktif`}
         />
         <StatCard
           title="Anggota Aktif"
-          value={totalAnggotaAktif}
+          value={countStats.anggotaAktif}
           icon={Users}
           iconClassName="bg-success/10"
         />
@@ -635,12 +666,16 @@ export default function LaporanPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="secondary">
                     {selectedStatusAnggota === 'all' 
-                      ? anggotaList.length 
-                      : anggotaList.filter(a => a.status === selectedStatusAnggota).length} data
+                      ? countStats.totalAnggota 
+                      : selectedStatusAnggota === 'aktif' 
+                        ? countStats.anggotaAktif 
+                        : selectedStatusAnggota === 'nonaktif'
+                          ? countStats.anggotaNonaktif
+                          : countStats.anggotaMeninggal} data
                   </Badge>
                   {selectedStatusAnggota === 'all' && (
                     <span className="text-xs text-muted-foreground">
-                      ({anggotaList.filter(a => a.status === 'aktif').length} aktif, {anggotaList.filter(a => a.status === 'nonaktif').length} nonaktif, {anggotaList.filter(a => a.status === 'meninggal').length} meninggal)
+                      ({countStats.anggotaAktif} aktif, {countStats.anggotaNonaktif} nonaktif, {countStats.anggotaMeninggal} meninggal)
                     </span>
                   )}
                 </div>
