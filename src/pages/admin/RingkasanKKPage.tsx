@@ -33,6 +33,7 @@ interface KKSummary {
 export default function RingkasanKKPage() {
   const [anggotaList, setAnggotaList] = useState<Anggota[]>([]);
   const [loading, setLoading] = useState(true);
+  const [totalAnggotaAktif, setTotalAnggotaAktif] = useState(0);
 
   useEffect(() => {
     fetchData();
@@ -40,13 +41,38 @@ export default function RingkasanKKPage() {
 
   const fetchData = async () => {
     try {
-      const { data } = await supabase
+      // === COUNT langsung dari database (tidak terbatas limit 1000) ===
+      const { count: countAnggotaAktif } = await supabase
         .from('anggota')
-        .select('*')
-        .eq('status', 'aktif')
-        .order('nama_lengkap');
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'aktif');
 
-      setAnggotaList(data as Anggota[] || []);
+      setTotalAnggotaAktif(countAnggotaAktif || 0);
+
+      // Fetch semua data anggota aktif dengan batching
+      const allAnggota: Anggota[] = [];
+      const batchSize = 1000;
+      let offset = 0;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data } = await supabase
+          .from('anggota')
+          .select('*')
+          .eq('status', 'aktif')
+          .order('nama_lengkap')
+          .range(offset, offset + batchSize - 1);
+
+        if (data && data.length > 0) {
+          allAnggota.push(...(data as Anggota[]));
+          offset += batchSize;
+          hasMore = data.length === batchSize;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      setAnggotaList(allAnggota);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -249,9 +275,9 @@ export default function RingkasanKKPage() {
         />
         <StatCard
           title="Total Anggota Aktif"
-          value={totalAnggota}
+          value={totalAnggotaAktif}
           icon={Users}
-          tooltip="Total anggota dengan status aktif dari semua KK"
+          tooltip="Total anggota dengan status aktif dari semua KK (dihitung langsung dari database)"
         />
       </div>
 
