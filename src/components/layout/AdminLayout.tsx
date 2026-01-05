@@ -25,6 +25,7 @@ import {
   ChevronRight,
   ShieldCheck,
   Database,
+  PieChart,
 } from 'lucide-react';
 
 const adminMenuItems = [
@@ -37,6 +38,7 @@ const adminMenuItems = [
   { icon: Skull, label: 'Kematian', href: '/admin/kematian' },
   { icon: HandHeart, label: 'Santunan', href: '/admin/santunan' },
   { icon: FileText, label: 'Laporan', href: '/admin/laporan' },
+  { icon: PieChart, label: 'Ringkasan KK', href: '/admin/ringkasan-kk' },
   { icon: ShieldCheck, label: 'Validasi Data', href: '/admin/validasi-data' },
   { icon: Database, label: 'Migrasi Data', href: '/admin/migrasi-data' },
   { icon: Settings, label: 'Pengaturan', href: '/admin/pengaturan' },
