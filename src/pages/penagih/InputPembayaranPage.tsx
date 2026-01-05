@@ -59,7 +59,7 @@ export default function InputPembayaranPage() {
       
       const { data: anggotaData } = await supabase
         .from('anggota')
-        .select('id, no_kk, rt, rw, nama_lengkap, hubungan_kk')
+        .select('id, no_kk, rt, rw, nama_lengkap, status_dalam_kk')
         .eq('status', 'aktif');
       
       const filteredAnggota = anggotaData?.filter(a => 
@@ -82,7 +82,7 @@ export default function InputPembayaranPage() {
         .order('jatuh_tempo', { ascending: true });
 
       const processedData: TagihanWithKK[] = (tagihanData || []).map(t => {
-        const kepala = filteredAnggota.find(a => a.no_kk === t.no_kk && a.hubungan_kk === 'Kepala Keluarga')
+        const kepala = filteredAnggota.find(a => a.no_kk === t.no_kk && a.status_dalam_kk === 'kepala_keluarga')
           || filteredAnggota.find(a => a.no_kk === t.no_kk);
         return { ...t, kepala_keluarga: kepala as Anggota };
       });

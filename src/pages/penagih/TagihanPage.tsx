@@ -116,7 +116,7 @@ export default function PenagihTagihanPage() {
       // Map kepala keluarga to tagihan
       const tagihanWithKK = (tagihanData || []).map(t => {
         const kepala = filteredAnggota.find(a => 
-          a.no_kk === t.no_kk && a.hubungan_kk === 'Kepala Keluarga'
+          a.no_kk === t.no_kk && a.status_dalam_kk === 'kepala_keluarga'
         ) || filteredAnggota.find(a => a.no_kk === t.no_kk);
         return { ...t, kepala_keluarga: kepala } as TagihanWithKK;
       });

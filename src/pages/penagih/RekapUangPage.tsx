@@ -86,7 +86,7 @@ export default function RekapUangPage() {
       
       const { data: anggotaData } = await supabase
         .from('anggota')
-        .select('id, no_kk, rt, rw, nama_lengkap, hubungan_kk')
+        .select('id, no_kk, rt, rw, nama_lengkap, status_dalam_kk')
         .eq('status', 'aktif');
       
       const filteredAnggota = anggotaData?.filter(a => 
@@ -96,7 +96,7 @@ export default function RekapUangPage() {
       const uniqueKKs = [...new Set(filteredAnggota.map(a => a.no_kk))];
 
       const kkOpts: KKOption[] = uniqueKKs.map(kk => {
-        const kepala = filteredAnggota.find(a => a.no_kk === kk && a.hubungan_kk === 'Kepala Keluarga')
+        const kepala = filteredAnggota.find(a => a.no_kk === kk && a.status_dalam_kk === 'kepala_keluarga')
           || filteredAnggota.find(a => a.no_kk === kk);
         return { no_kk: kk, nama_kk: kepala?.nama_lengkap || kk };
       });
@@ -128,7 +128,7 @@ export default function RekapUangPage() {
       let processedData: PembayaranWithDetails[] = (pembayaranData || []).map((p: any) => {
         const tagihan = p.iuran_tagihan as IuranTagihan;
         const kepala = tagihan ? filteredAnggota.find(a => 
-          a.no_kk === tagihan.no_kk && a.hubungan_kk === 'Kepala Keluarga'
+          a.no_kk === tagihan.no_kk && a.status_dalam_kk === 'kepala_keluarga'
         ) || filteredAnggota.find(a => a.no_kk === tagihan.no_kk) : null;
         return {
           ...p,
