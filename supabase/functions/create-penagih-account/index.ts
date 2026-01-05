@@ -119,12 +119,48 @@ serve(async (req) => {
 
     // Check if email already exists
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
-    const emailExists = existingUsers?.users?.some(u => u.email?.toLowerCase() === email.toLowerCase());
-    if (emailExists) {
-      return new Response(JSON.stringify({ error: 'Email sudah digunakan oleh akun lain. Gunakan email yang berbeda.' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    const existingUser = existingUsers?.users?.find(u => u.email?.toLowerCase() === email.toLowerCase());
+    
+    if (existingUser) {
+      // Check if this is an orphaned auth user (no penagih record exists)
+      const { data: existingPenagih } = await supabaseAdmin
+        .from('penagih')
+        .select('id')
+        .eq('user_id', existingUser.id)
+        .maybeSingle();
+      
+      if (existingPenagih) {
+        // Active penagih account exists - cannot reuse email
+        return new Response(JSON.stringify({ error: 'Email sudah digunakan oleh akun penagih lain. Gunakan email yang berbeda.' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      // Orphaned auth user - clean it up before creating new account
+      console.log(`Found orphaned auth user ${existingUser.id} for email ${email}, cleaning up...`);
+      
+      // Clean up related records first
+      await supabaseAdmin.from('penagih_wilayah').delete().eq('penagih_user_id', existingUser.id);
+      await supabaseAdmin.from('user_roles').delete().eq('user_id', existingUser.id);
+      await supabaseAdmin.from('profiles').delete().eq('user_id', existingUser.id);
+      
+      // Nullify payment references
+      await supabaseAdmin
+        .from('iuran_pembayaran')
+        .update({ penagih_user_id: null })
+        .eq('penagih_user_id', existingUser.id);
+      
+      // Delete orphaned auth user
+      const { error: deleteOrphanError } = await supabaseAdmin.auth.admin.deleteUser(existingUser.id);
+      if (deleteOrphanError) {
+        console.error('Failed to clean up orphaned user:', deleteOrphanError);
+        return new Response(JSON.stringify({ error: 'Email terkait dengan akun lama yang gagal dihapus. Hubungi administrator.' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      console.log(`Orphaned auth user ${existingUser.id} cleaned up successfully`);
     }
 
     // Create user with admin API
