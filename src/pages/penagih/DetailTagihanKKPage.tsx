@@ -92,9 +92,9 @@ export default function DetailTagihanKKPage() {
         .eq('status', 'aktif');
 
       if (anggotaData) {
-        const kepala = anggotaData.find(a => a.hubungan_kk === 'Kepala Keluarga') || anggotaData[0];
-        setKepalaKeluarga(kepala || null);
-        setAnggotaKeluarga(anggotaData);
+        const kepala = anggotaData.find(a => a.status_dalam_kk === 'kepala_keluarga') || anggotaData[0];
+        setKepalaKeluarga(kepala as any || null);
+        setAnggotaKeluarga(anggotaData as any);
       }
 
       // Fetch tagihan

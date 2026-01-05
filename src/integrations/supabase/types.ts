@@ -35,6 +35,7 @@ export type Database = {
           rt: string | null
           rw: string | null
           status: Database["public"]["Enums"]["status_anggota"]
+          status_dalam_kk: string | null
           status_perkawinan: string | null
           tanggal_bergabung: string
           tanggal_lahir: string | null
@@ -62,6 +63,7 @@ export type Database = {
           rt?: string | null
           rw?: string | null
           status?: Database["public"]["Enums"]["status_anggota"]
+          status_dalam_kk?: string | null
           status_perkawinan?: string | null
           tanggal_bergabung?: string
           tanggal_lahir?: string | null
@@ -89,6 +91,7 @@ export type Database = {
           rt?: string | null
           rw?: string | null
           status?: Database["public"]["Enums"]["status_anggota"]
+          status_dalam_kk?: string | null
           status_perkawinan?: string | null
           tanggal_bergabung?: string
           tanggal_lahir?: string | null

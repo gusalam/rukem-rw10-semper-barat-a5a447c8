@@ -44,7 +44,17 @@ import { useDebounce } from '@/hooks/use-mobile';
 
 const AGAMA_OPTIONS = ['Islam', 'Kristen', 'Katolik', 'Hindu', 'Buddha', 'Konghucu'];
 const STATUS_PERKAWINAN_OPTIONS = ['Belum Kawin', 'Kawin', 'Cerai Hidup', 'Cerai Mati'];
-const HUBUNGAN_KK_OPTIONS = ['Kepala Keluarga', 'Istri', 'Anak', 'Orang Tua', 'Anggota Keluarga Lainnya'];
+
+// Status Dalam KK - nilai standar sistem
+const STATUS_DALAM_KK_OPTIONS = [
+  { value: 'kepala_keluarga', label: 'Kepala Keluarga' },
+  { value: 'istri', label: 'Istri' },
+  { value: 'anak', label: 'Anak' },
+  { value: 'orang_tua', label: 'Orang Tua' },
+  { value: 'famili', label: 'Famili' },
+  { value: 'lainnya', label: 'Lainnya' },
+] as const;
+
 const STATUS_ANGGOTA_OPTIONS = [
   { value: 'aktif', label: 'Aktif' },
   { value: 'nonaktif', label: 'Tidak Aktif' },
@@ -61,7 +71,9 @@ const anggotaSchema = z.object({
   agama: z.string().min(1, 'Agama wajib diisi'),
   status_perkawinan: z.string().min(1, 'Status perkawinan wajib diisi'),
   pekerjaan: z.string().min(2, 'Pekerjaan wajib diisi'),
-  hubungan_kk: z.string().min(1, 'Status hubungan dalam KK wajib diisi'),
+  status_dalam_kk: z.enum(['kepala_keluarga', 'istri', 'anak', 'orang_tua', 'famili', 'lainnya'], { 
+    required_error: 'Status dalam KK wajib diisi' 
+  }),
   alamat: z.string().min(5, 'Alamat lengkap wajib diisi'),
   rt: z.string().min(1, 'RT wajib diisi'),
   rw: z.string().min(1, 'RW wajib diisi'),
@@ -85,7 +97,7 @@ const emptyFormData: FormData = {
   agama: '',
   status_perkawinan: '',
   pekerjaan: '',
-  hubungan_kk: '',
+  status_dalam_kk: undefined as any, // Required field
   alamat: '',
   rt: '',
   rw: '',
@@ -381,7 +393,7 @@ export default function AnggotaPage() {
       agama: anggota.agama || '',
       status_perkawinan: anggota.status_perkawinan || '',
       pekerjaan: anggota.pekerjaan || '',
-      hubungan_kk: anggota.hubungan_kk || '',
+      status_dalam_kk: (anggota.status_dalam_kk as any) || undefined,
       alamat: anggota.alamat,
       rt: anggota.rt || '',
       rw: anggota.rw || '',
@@ -419,7 +431,17 @@ export default function AnggotaPage() {
     { key: 'agama', header: 'Agama' },
     { key: 'status_perkawinan', header: 'Status Perkawinan' },
     { key: 'pekerjaan', header: 'Pekerjaan' },
-    { key: 'hubungan_kk', header: 'Status Dalam KK' },
+    { key: 'status_dalam_kk', header: 'Status Dalam KK', format: (v: string) => {
+      const map: Record<string, string> = {
+        'kepala_keluarga': 'Kepala Keluarga',
+        'istri': 'Istri',
+        'anak': 'Anak',
+        'orang_tua': 'Orang Tua',
+        'famili': 'Famili',
+        'lainnya': 'Lainnya',
+      };
+      return map[v] || v || '-';
+    }},
     { key: 'alamat', header: 'Alamat' },
     { key: 'rt', header: 'RT' },
     { key: 'rw', header: 'RW' },
@@ -438,7 +460,17 @@ export default function AnggotaPage() {
     { key: 'nik', header: 'NIK' },
     { key: 'no_kk', header: 'No. KK' },
     { key: 'jenis_kelamin', header: 'L/P', format: (v: string) => v || '-' },
-    { key: 'hubungan_kk', header: 'Hubungan KK' },
+    { key: 'status_dalam_kk', header: 'Status KK', format: (v: string) => {
+      const map: Record<string, string> = {
+        'kepala_keluarga': 'Kepala',
+        'istri': 'Istri',
+        'anak': 'Anak',
+        'orang_tua': 'Ortu',
+        'famili': 'Famili',
+        'lainnya': 'Lain',
+      };
+      return map[v] || v || '-';
+    }},
     { key: 'alamat', header: 'Alamat' },
     { key: 'no_hp', header: 'No. HP' },
     { key: 'status', header: 'Status' },
@@ -532,6 +564,13 @@ export default function AnggotaPage() {
     }
   };
 
+  // Helper function to get status dalam KK label
+  const getStatusDalamKKLabel = (value: string | null) => {
+    if (!value) return '-';
+    const opt = STATUS_DALAM_KK_OPTIONS.find(o => o.value === value);
+    return opt ? opt.label : value;
+  };
+
   const columns = [
     {
       key: 'nama_lengkap',
@@ -539,7 +578,7 @@ export default function AnggotaPage() {
       cell: (item: Anggota) => (
         <div>
           <p className="font-medium">{item.nama_lengkap}</p>
-          <p className="text-xs text-muted-foreground">{item.hubungan_kk || '-'}</p>
+          <p className="text-xs text-muted-foreground">{getStatusDalamKKLabel(item.status_dalam_kk)}</p>
         </div>
       ),
     },
@@ -789,20 +828,23 @@ export default function AnggotaPage() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="hubungan_kk">Status Dalam KK *</Label>
+                    <Label htmlFor="status_dalam_kk">Status Dalam KK *</Label>
                     <Select
-                      value={formData.hubungan_kk}
-                      onValueChange={(value) => setFormData({ ...formData, hubungan_kk: value })}
+                      value={formData.status_dalam_kk || ''}
+                      onValueChange={(value: 'kepala_keluarga' | 'istri' | 'anak' | 'orang_tua' | 'famili' | 'lainnya') => setFormData({ ...formData, status_dalam_kk: value })}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Pilih" />
+                        <SelectValue placeholder="Pilih Status dalam KK" />
                       </SelectTrigger>
                       <SelectContent>
-                        {HUBUNGAN_KK_OPTIONS.map((opt) => (
-                          <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                        {STATUS_DALAM_KK_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Satu KK hanya boleh memiliki satu Kepala Keluarga
+                    </p>
                   </div>
                 </div>
 
