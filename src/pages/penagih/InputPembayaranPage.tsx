@@ -79,11 +79,12 @@ export default function InputPembayaranPage() {
         return;
       }
 
+      // Ambil tagihan belum_bayar DAN menunggu_admin agar data inputan tetap tampil
       const { data: tagihanData } = await supabase
         .from('iuran_tagihan')
         .select('*')
         .in('no_kk', uniqueKKs)
-        .in('status', ['belum_bayar'])
+        .in('status', ['belum_bayar', 'menunggu_admin'])
         .order('jatuh_tempo', { ascending: true });
 
       const processedData: TagihanWithKK[] = (tagihanData || []).map(t => {
