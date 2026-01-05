@@ -448,21 +448,40 @@ export default function AnggotaPage() {
   const [exporting, setExporting] = useState(false);
 
   // Fetch all data for export (without pagination limit)
+  // Supabase has 1000 row limit, so we fetch in batches
   const fetchAllAnggotaForExport = async (): Promise<Anggota[]> => {
-    const { data, error } = await supabase
-      .from('anggota')
-      .select('*')
-      .order('nama_lengkap');
+    const batchSize = 1000;
+    let allData: Anggota[] = [];
+    let from = 0;
+    let hasMore = true;
     
-    if (error) {
-      toast({
-        variant: 'destructive',
-        title: 'Gagal Mengambil Data',
-        description: 'Tidak dapat mengambil semua data untuk export.',
-      });
-      return [];
+    while (hasMore) {
+      const { data, error } = await supabase
+        .from('anggota')
+        .select('*')
+        .order('nama_lengkap')
+        .range(from, from + batchSize - 1);
+      
+      if (error) {
+        toast({
+          variant: 'destructive',
+          title: 'Gagal Mengambil Data',
+          description: 'Tidak dapat mengambil semua data untuk export.',
+        });
+        return [];
+      }
+      
+      if (data && data.length > 0) {
+        allData = [...allData, ...(data as Anggota[])];
+        from += batchSize;
+        // If we got less than batchSize, we've reached the end
+        hasMore = data.length === batchSize;
+      } else {
+        hasMore = false;
+      }
     }
-    return data as Anggota[];
+    
+    return allData;
   };
 
   const handleExportPDF = () => {
