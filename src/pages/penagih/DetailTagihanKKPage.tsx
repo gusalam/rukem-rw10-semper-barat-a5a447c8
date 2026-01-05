@@ -3,14 +3,13 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { PenagihLayout } from '@/components/layout/PenagihLayout';
-import { PageTransition } from '@/components/ui/page-transition';
-import { PageHeader } from '@/components/ui/page-header';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -18,14 +17,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import {
   ArrowLeft,
   Users,
@@ -173,300 +164,226 @@ export default function DetailTagihanKKPage() {
 
   if (loading) {
     return (
-      <PenagihLayout>
-        <PageTransition>
-          <div className="space-y-6">
-            <Skeleton className="h-10 w-64" />
-            <div className="grid gap-4 md:grid-cols-3">
-              <Skeleton className="h-24" />
-              <Skeleton className="h-24" />
-              <Skeleton className="h-24" />
-            </div>
-            <Skeleton className="h-64" />
+      <PenagihLayout title="Detail KK">
+        <div className="space-y-4">
+          <Skeleton className="h-32 w-full rounded-xl" />
+          <div className="grid grid-cols-2 gap-3">
+            {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-20 rounded-xl" />)}
           </div>
-        </PageTransition>
+          <Skeleton className="h-64 rounded-xl" />
+        </div>
       </PenagihLayout>
     );
   }
 
   if (!kepalaKeluarga) {
     return (
-      <PenagihLayout>
-        <PageTransition>
-          <EmptyState
-            icon={Users}
-            title="Data Tidak Ditemukan"
-            description="Kartu Keluarga tidak ditemukan atau tidak dalam wilayah tugas Anda"
-          >
-            <Button onClick={() => navigate('/penagih/riwayat-tagihan')}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Kembali
-            </Button>
-          </EmptyState>
-        </PageTransition>
+      <PenagihLayout title="Detail KK">
+        <EmptyState
+          icon={Users}
+          title="Data Tidak Ditemukan"
+          description="Kartu Keluarga tidak ditemukan atau tidak dalam wilayah tugas Anda"
+        >
+          <Button onClick={() => navigate('/penagih/riwayat-tagihan')}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Kembali
+          </Button>
+        </EmptyState>
       </PenagihLayout>
     );
   }
 
   return (
-    <PenagihLayout>
-      <PageTransition>
-        <div className="space-y-6">
-          {/* Header */}
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate(-1)}
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <PageHeader
-              title={kepalaKeluarga.nama_lengkap}
-              description={`No. KK: ${noKK}`}
-            />
-          </div>
-
-          {/* Info Kepala Keluarga */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Users className="h-5 w-5 text-primary" />
-                Informasi Kepala Keluarga
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-primary/10">
-                    <Users className="h-4 w-4 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Jumlah Anggota</p>
-                    <p className="font-medium">{anggotaKeluarga.length} orang</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-primary/10">
-                    <Phone className="h-4 w-4 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">No. HP</p>
-                    <p className="font-medium">{kepalaKeluarga.no_hp || '-'}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 sm:col-span-2">
-                  <div className="p-2 rounded-lg bg-primary/10">
-                    <MapPin className="h-4 w-4 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Alamat</p>
-                    <p className="font-medium">{kepalaKeluarga.alamat}</p>
-                    <p className="text-xs text-muted-foreground">
-                      RT {kepalaKeluarga.rt}/RW {kepalaKeluarga.rw}
-                    </p>
-                  </div>
+    <PenagihLayout title="Detail KK">
+      <div className="space-y-4">
+        {/* Header Card */}
+        <Card className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-4">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate(-1)}
+                className="shrink-0 -ml-2"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-xl font-bold truncate">{kepalaKeluarga.nama_lengkap}</h2>
+                <p className="text-sm text-muted-foreground">KK: {noKK}</p>
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                  <Badge variant="outline" className="text-xs">
+                    <Users className="h-3 w-3 mr-1" />
+                    {anggotaKeluarga.length} anggota
+                  </Badge>
+                  <Badge variant="outline" className="text-xs">
+                    <MapPin className="h-3 w-3 mr-1" />
+                    RT {kepalaKeluarga.rt}/RW {kepalaKeluarga.rw}
+                  </Badge>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+            {kepalaKeluarga.no_hp && (
+              <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+                <Phone className="h-4 w-4" />
+                <a href={`tel:${kepalaKeluarga.no_hp}`} className="hover:underline">{kepalaKeluarga.no_hp}</a>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-          {/* Statistik */}
-          <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-blue-500/10">
-                    <Receipt className="h-5 w-5 text-blue-500" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold">{stats.totalTagihan}</p>
-                    <p className="text-xs text-muted-foreground">Total Tagihan</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-green-500/10">
-                    <CheckCircle className="h-5 w-5 text-green-500" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold">{stats.totalLunas}</p>
-                    <p className="text-xs text-muted-foreground">Lunas</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-yellow-500/10">
-                    <Clock className="h-5 w-5 text-yellow-500" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold">{stats.totalMenunggu}</p>
-                    <p className="text-xs text-muted-foreground">Menunggu</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-red-500/10">
-                    <Banknote className="h-5 w-5 text-red-500" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold">{stats.totalBelumBayar}</p>
-                    <p className="text-xs text-muted-foreground">Belum Bayar</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Ringkasan Nominal */}
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card className="border-green-500/20 bg-green-500/5">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Total Terbayar</p>
-                    <p className="text-2xl font-bold text-green-600">{formatCurrency(stats.nominalLunas)}</p>
-                  </div>
-                  <CheckCircle className="h-8 w-8 text-green-500/50" />
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="border-red-500/20 bg-red-500/5">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Total Tunggakan</p>
-                    <p className="text-2xl font-bold text-red-600">{formatCurrency(stats.nominalBelumBayar)}</p>
-                  </div>
-                  <XCircle className="h-8 w-8 text-red-500/50" />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Riwayat Tagihan */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
+        {/* Stats Grid */}
+        <div className="grid grid-cols-2 gap-3">
+          <Card className="border-primary/20 bg-primary/5">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-2">
                 <Receipt className="h-5 w-5 text-primary" />
-                Riwayat Tagihan & Pembayaran
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Filter Section */}
-              <div className="flex flex-col sm:flex-row gap-2">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Cari periode..."
-                    value={searchPeriode}
-                    onChange={(e) => setSearchPeriode(e.target.value)}
-                    className="pl-9"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <div className="relative">
-                    <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
-                    <Select value={filterStatus} onValueChange={setFilterStatus}>
-                      <SelectTrigger className="w-[150px] pl-9">
-                        <SelectValue placeholder="Status" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-popover">
-                        <SelectItem value="all">Semua Status</SelectItem>
-                        <SelectItem value="belum_bayar">Belum Bayar</SelectItem>
-                        <SelectItem value="menunggu_admin">Menunggu</SelectItem>
-                        <SelectItem value="lunas">Lunas</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="relative">
-                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
-                    <Select value={filterYear} onValueChange={setFilterYear}>
-                      <SelectTrigger className="w-[130px] pl-9">
-                        <SelectValue placeholder="Tahun" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-popover">
-                        <SelectItem value="all">Semua Tahun</SelectItem>
-                        {yearOptions.map(year => (
-                          <SelectItem key={year} value={year}>{year}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {(searchPeriode || filterStatus !== 'all' || filterYear !== 'all') && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        setSearchPeriode('');
-                        setFilterStatus('all');
-                        setFilterYear('all');
-                      }}
-                      title="Reset filter"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  )}
+                <div>
+                  <p className="text-lg font-bold">{stats.totalTagihan}</p>
+                  <p className="text-[10px] text-muted-foreground">Total Tagihan</p>
                 </div>
               </div>
-
-              {/* Filtered Results */}
-              <FilteredTagihanList
-                tagihanList={tagihanList}
-                searchPeriode={searchPeriode}
-                filterStatus={filterStatus}
-                filterYear={filterYear}
-                getStatusIcon={getStatusIcon}
-              />
             </CardContent>
           </Card>
-
-          {/* Anggota Keluarga */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Users className="h-5 w-5 text-primary" />
-                Anggota Keluarga ({anggotaKeluarga.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nama</TableHead>
-                    <TableHead>Hubungan</TableHead>
-                    <TableHead className="hidden md:table-cell">NIK</TableHead>
-                    <TableHead className="hidden md:table-cell">Tanggal Bergabung</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {anggotaKeluarga.map((anggota) => (
-                    <TableRow key={anggota.id}>
-                      <TableCell className="font-medium">{anggota.nama_lengkap}</TableCell>
-                      <TableCell>{anggota.hubungan_kk || '-'}</TableCell>
-                      <TableCell className="hidden md:table-cell text-muted-foreground">
-                        {anggota.nik}
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        {formatDate(anggota.tanggal_bergabung)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+          <Card className="border-success/20 bg-success/5">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-success" />
+                <div>
+                  <p className="text-lg font-bold">{stats.totalLunas}</p>
+                  <p className="text-[10px] text-muted-foreground">Lunas</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-warning/20 bg-warning/5">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-2">
+                <Clock className="h-5 w-5 text-warning" />
+                <div>
+                  <p className="text-lg font-bold">{stats.totalMenunggu}</p>
+                  <p className="text-[10px] text-muted-foreground">Menunggu</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-destructive/20 bg-destructive/5">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-2">
+                <Banknote className="h-5 w-5 text-destructive" />
+                <div>
+                  <p className="text-lg font-bold">{stats.totalBelumBayar}</p>
+                  <p className="text-[10px] text-muted-foreground">Belum Bayar</p>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
-      </PageTransition>
+
+        {/* Ringkasan Nominal */}
+        <div className="grid grid-cols-2 gap-3">
+          <Card className="border-success/20 bg-success/5">
+            <CardContent className="p-4 text-center">
+              <CheckCircle className="h-6 w-6 text-success mx-auto" />
+              <p className="text-sm font-bold text-success mt-1">{formatCurrency(stats.nominalLunas)}</p>
+              <p className="text-[10px] text-muted-foreground">Terbayar</p>
+            </CardContent>
+          </Card>
+          <Card className="border-destructive/20 bg-destructive/5">
+            <CardContent className="p-4 text-center">
+              <XCircle className="h-6 w-6 text-destructive mx-auto" />
+              <p className="text-sm font-bold text-destructive mt-1">{formatCurrency(stats.nominalBelumBayar)}</p>
+              <p className="text-[10px] text-muted-foreground">Tunggakan</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Filter & Search */}
+        <div className="space-y-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Cari periode..."
+              value={searchPeriode}
+              onChange={(e) => setSearchPeriode(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="pl-9">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Status</SelectItem>
+                  <SelectItem value="belum_bayar">Belum Bayar</SelectItem>
+                  <SelectItem value="menunggu_admin">Menunggu</SelectItem>
+                  <SelectItem value="lunas">Lunas</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="relative flex-1">
+              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
+              <Select value={filterYear} onValueChange={setFilterYear}>
+                <SelectTrigger className="pl-9">
+                  <SelectValue placeholder="Tahun" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Tahun</SelectItem>
+                  {yearOptions.map(year => (
+                    <SelectItem key={year} value={year}>{year}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {(searchPeriode || filterStatus !== 'all' || filterYear !== 'all') && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  setSearchPeriode('');
+                  setFilterStatus('all');
+                  setFilterYear('all');
+                }}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Tagihan List */}
+        <FilteredTagihanList
+          tagihanList={tagihanList}
+          searchPeriode={searchPeriode}
+          filterStatus={filterStatus}
+          filterYear={filterYear}
+          getStatusIcon={getStatusIcon}
+        />
+
+        {/* Anggota Keluarga */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Users className="h-5 w-5 text-primary" />
+              <h3 className="font-semibold">Anggota Keluarga ({anggotaKeluarga.length})</h3>
+            </div>
+            <div className="space-y-3">
+              {anggotaKeluarga.map((anggota) => (
+                <div key={anggota.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                  <div>
+                    <p className="font-medium text-sm">{anggota.nama_lengkap}</p>
+                    <p className="text-xs text-muted-foreground">{anggota.hubungan_kk || '-'}</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{anggota.nik}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </PenagihLayout>
   );
 }
@@ -525,93 +442,69 @@ function FilteredTagihanList({
   }
 
   return (
-    <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">
+    <div className="space-y-3">
+      <p className="text-xs text-muted-foreground">
         Menampilkan {filteredTagihan.length} dari {tagihanList.length} tagihan
       </p>
       {filteredTagihan.map((tagihan) => (
-        <div
-          key={tagihan.id}
-          className="border rounded-lg p-4 space-y-3"
-        >
-          {/* Tagihan Header */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-muted">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="font-medium">{formatPeriode(tagihan.periode)}</p>
-                <p className="text-xs text-muted-foreground">
-                  Jatuh tempo: {formatDate(tagihan.jatuh_tempo)}
-                </p>
-              </div>
-            </div>
-            <div className="text-right">
-              <p className="font-bold">{formatCurrency(tagihan.nominal)}</p>
-              <StatusBadge status={tagihan.status} />
-            </div>
-          </div>
-
-          {/* Pembayaran List */}
-          {tagihan.pembayaran && tagihan.pembayaran.length > 0 && (
-            <div className="ml-4 pl-4 border-l-2 border-muted space-y-2">
-              <p className="text-xs font-medium text-muted-foreground uppercase">
-                Riwayat Pembayaran
-              </p>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[100px]">Tanggal</TableHead>
-                    <TableHead>Nominal</TableHead>
-                    <TableHead>Metode</TableHead>
-                    <TableHead className="text-right">Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {tagihan.pembayaran.map((pembayaran) => (
-                    <TableRow key={pembayaran.id}>
-                      <TableCell className="text-sm">
-                        {formatDate(pembayaran.tanggal_bayar)}
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {formatCurrency(pembayaran.nominal)}
-                      </TableCell>
-                      <TableCell>
-                        <span className="capitalize">{pembayaran.metode}</span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          {getStatusIcon(pembayaran.status)}
-                          <StatusBadge status={pembayaran.status} />
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              {tagihan.pembayaran.some(p => p.alasan_tolak) && (
-                <div className="text-xs text-red-500">
-                  {tagihan.pembayaran
-                    .filter(p => p.alasan_tolak)
-                    .map(p => (
-                      <p key={p.id}>Ditolak: {p.alasan_tolak}</p>
-                    ))}
+        <Card key={tagihan.id}>
+          <CardContent className="p-4">
+            {/* Tagihan Header */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-lg bg-muted shrink-0">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
                 </div>
-              )}
+                <div>
+                  <p className="font-medium">{formatPeriode(tagihan.periode)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Jatuh tempo: {formatDate(tagihan.jatuh_tempo)}
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="font-bold text-primary">{formatCurrency(tagihan.nominal)}</p>
+                <StatusBadge status={tagihan.status} />
+              </div>
             </div>
-          )}
 
-          {/* No Pembayaran */}
-          {(!tagihan.pembayaran || tagihan.pembayaran.length === 0) && 
-           tagihan.status === 'belum_bayar' && (
-            <div className="ml-4 pl-4 border-l-2 border-muted">
-              <p className="text-xs text-muted-foreground italic">
+            {/* Pembayaran List */}
+            {tagihan.pembayaran && tagihan.pembayaran.length > 0 && (
+              <div className="mt-3 pt-3 border-t space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">Riwayat Pembayaran</p>
+                {tagihan.pembayaran.map((pembayaran) => (
+                  <div key={pembayaran.id} className="flex items-center justify-between p-2 bg-muted/50 rounded-lg text-sm">
+                    <div>
+                      <p className="font-medium">{formatCurrency(pembayaran.nominal)}</p>
+                      <p className="text-xs text-muted-foreground">{formatDate(pembayaran.tanggal_bayar)} • {pembayaran.metode}</p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {getStatusIcon(pembayaran.status)}
+                      <StatusBadge status={pembayaran.status} />
+                    </div>
+                  </div>
+                ))}
+                {tagihan.pembayaran.some(p => p.alasan_tolak) && (
+                  <div className="text-xs text-destructive p-2 bg-destructive/10 rounded">
+                    {tagihan.pembayaran
+                      .filter(p => p.alasan_tolak)
+                      .map(p => (
+                        <p key={p.id}>Ditolak: {p.alasan_tolak}</p>
+                      ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* No Pembayaran */}
+            {(!tagihan.pembayaran || tagihan.pembayaran.length === 0) && 
+             tagihan.status === 'belum_bayar' && (
+              <p className="mt-3 pt-3 border-t text-xs text-muted-foreground italic">
                 Belum ada pembayaran
               </p>
-            </div>
-          )}
-        </div>
+            )}
+          </CardContent>
+        </Card>
       ))}
     </div>
   );

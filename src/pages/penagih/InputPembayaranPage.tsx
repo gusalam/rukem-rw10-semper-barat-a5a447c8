@@ -2,15 +2,12 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { PenagihLayout } from '@/components/layout/PenagihLayout';
-import { PageHeader } from '@/components/ui/page-header';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { DataTable } from '@/components/ui/data-table';
 import { EmptyState } from '@/components/ui/empty-state';
-import { StatusBadge } from '@/components/ui/status-badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ImageUpload } from '@/components/ui/image-upload';
 import {
@@ -26,8 +23,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { CreditCard, Search, Plus } from 'lucide-react';
-import { formatCurrency, formatDate, formatPeriode } from '@/lib/format';
+import { CreditCard, Search, Plus, MapPin } from 'lucide-react';
+import { formatCurrency, formatPeriode } from '@/lib/format';
 import { toast } from 'sonner';
 import type { IuranTagihan, Anggota, MetodePembayaran } from '@/types/database';
 
@@ -60,7 +57,6 @@ export default function InputPembayaranPage() {
     try {
       const rtRwPairs = penagihWilayah.map(w => ({ rt: w.rt, rw: w.rw }));
       
-      // Get anggota in penagih wilayah
       const { data: anggotaData } = await supabase
         .from('anggota')
         .select('id, no_kk, rt, rw, nama_lengkap, hubungan_kk')
@@ -78,7 +74,6 @@ export default function InputPembayaranPage() {
         return;
       }
 
-      // Fetch tagihan that are not paid
       const { data: tagihanData } = await supabase
         .from('iuran_tagihan')
         .select('*')
@@ -104,7 +99,6 @@ export default function InputPembayaranPage() {
     fetchData();
   }, [fetchData]);
 
-  // Realtime subscription
   useEffect(() => {
     if (!user) return;
 
@@ -143,7 +137,6 @@ export default function InputPembayaranPage() {
 
     setSubmitting(true);
     try {
-      // Insert pembayaran
       const { error: pembayaranError } = await supabase
         .from('iuran_pembayaran')
         .insert({
@@ -159,7 +152,6 @@ export default function InputPembayaranPage() {
 
       if (pembayaranError) throw pembayaranError;
 
-      // Update tagihan status
       const { error: tagihanError } = await supabase
         .from('iuran_tagihan')
         .update({ status: 'menunggu_admin' })
@@ -185,94 +177,99 @@ export default function InputPembayaranPage() {
     t.periode?.includes(search)
   );
 
-  const columns = [
-    {
-      key: 'nama_kk',
-      header: 'Nama KK',
-      cell: (item: TagihanWithKK) => (
-        <div>
-          <p className="font-medium text-sm">{item.kepala_keluarga?.nama_lengkap || '-'}</p>
-          <p className="text-xs text-muted-foreground">KK: {item.no_kk}</p>
-        </div>
-      ),
-    },
-    {
-      key: 'periode',
-      header: 'Periode',
-      cell: (item: TagihanWithKK) => formatPeriode(item.periode),
-    },
-    {
-      key: 'nominal',
-      header: 'Nominal',
-      cell: (item: TagihanWithKK) => (
-        <span className="font-medium text-primary">{formatCurrency(item.nominal)}</span>
-      ),
-    },
-    {
-      key: 'jatuh_tempo',
-      header: 'Jatuh Tempo',
-      cell: (item: TagihanWithKK) => formatDate(item.jatuh_tempo),
-      className: 'hidden md:table-cell',
-    },
-    {
-      key: 'actions',
-      header: '',
-      cell: (item: TagihanWithKK) => (
-        <Button size="sm" onClick={() => openPaymentDialog(item)}>
-          <Plus className="h-4 w-4 mr-1" />
-          Input
-        </Button>
-      ),
-    },
-  ];
-
   if (loading) {
     return (
-      <PenagihLayout>
-        <div className="space-y-6">
-          <Skeleton className="h-10 w-48" />
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-64" />
+      <PenagihLayout title="Input Pembayaran">
+        <div className="space-y-4">
+          <Skeleton className="h-32 w-full rounded-xl" />
+          <Skeleton className="h-10 w-full rounded-xl" />
+          <Skeleton className="h-24 w-full rounded-xl" />
+          <Skeleton className="h-24 w-full rounded-xl" />
         </div>
       </PenagihLayout>
     );
   }
 
   return (
-    <PenagihLayout>
-      <PageHeader 
-        title="Input Pembayaran" 
-        description="Input pembayaran dari anggota"
-      />
-
+    <PenagihLayout title="Input Pembayaran">
       <div className="space-y-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Cari nama KK, No. KK, atau periode..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
-        </div>
+        {/* Header Card */}
+        <Card className="bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-500/20">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 rounded-full bg-green-500/20">
+                <CreditCard className="h-8 w-8 text-green-600 dark:text-green-400" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold">Input Pembayaran</h2>
+                <p className="text-sm text-muted-foreground">{filteredTagihan.length} tagihan belum dibayar</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-        {filteredTagihan.length === 0 ? (
+        {penagihWilayah.length === 0 ? (
           <EmptyState
-            icon={CreditCard}
-            title="Tidak Ada Tagihan"
-            description={search ? 'Tidak ada tagihan yang sesuai pencarian.' : 'Semua tagihan sudah dibayar atau sedang menunggu verifikasi.'}
+            icon={MapPin}
+            title="Belum Ada Wilayah"
+            description="Anda belum ditugaskan ke wilayah manapun"
           />
         ) : (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">
-                Tagihan Belum Dibayar ({filteredTagihan.length} tagihan)
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <DataTable columns={columns} data={filteredTagihan} />
-            </CardContent>
-          </Card>
+          <>
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Cari nama KK, No. KK, atau periode..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+
+            {/* Tagihan List */}
+            <div className="space-y-3">
+              {filteredTagihan.length === 0 ? (
+                <EmptyState
+                  icon={CreditCard}
+                  title="Tidak Ada Tagihan"
+                  description={search ? 'Tidak ada tagihan yang sesuai pencarian.' : 'Semua tagihan sudah dibayar atau sedang menunggu verifikasi.'}
+                />
+              ) : (
+                filteredTagihan.map((item) => (
+                  <Card key={item.id} className="hover:shadow-md transition-shadow">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-start gap-3 flex-1 min-w-0">
+                          <div className="p-2 rounded-lg bg-destructive/10 shrink-0">
+                            <CreditCard className="h-5 w-5 text-destructive" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium truncate">{item.kepala_keluarga?.nama_lengkap || '-'}</p>
+                            <p className="text-xs text-muted-foreground">KK: {item.no_kk}</p>
+                            <p className="text-sm text-primary font-medium mt-1">
+                              {formatPeriode(item.periode)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0 ml-2">
+                          <p className="font-bold text-destructive">{formatCurrency(item.nominal)}</p>
+                          <Button
+                            size="sm"
+                            className="mt-2"
+                            onClick={() => openPaymentDialog(item)}
+                          >
+                            <Plus className="h-4 w-4 mr-1" />
+                            Bayar
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
+          </>
         )}
       </div>
 

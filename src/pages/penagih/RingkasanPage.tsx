@@ -2,8 +2,6 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { PenagihLayout } from '@/components/layout/PenagihLayout';
-import { PageHeader } from '@/components/ui/page-header';
-import { StatCard } from '@/components/ui/stat-card';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
@@ -16,7 +14,8 @@ import {
   Clock, 
   Wallet,
   BarChart3,
-  PieChart as PieChartIcon
+  PieChart as PieChartIcon,
+  Home
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/format';
 import {
@@ -35,11 +34,8 @@ import {
   PieChart, 
   Pie, 
   Cell,
-  LineChart,
-  Line,
   CartesianGrid,
   Tooltip,
-  Legend
 } from 'recharts';
 
 interface DashboardStats {
@@ -62,8 +58,6 @@ interface MonthlyData {
   tagihan: number;
 }
 
-const COLORS = ['hsl(var(--destructive))', 'hsl(var(--warning))', 'hsl(var(--success))'];
-
 const chartConfig = {
   terkumpul: {
     label: "Terkumpul",
@@ -72,18 +66,6 @@ const chartConfig = {
   tagihan: {
     label: "Tagihan",
     color: "hsl(var(--primary))",
-  },
-  belumBayar: {
-    label: "Belum Bayar",
-    color: "hsl(var(--destructive))",
-  },
-  menunggu: {
-    label: "Menunggu",
-    color: "hsl(var(--warning))",
-  },
-  lunas: {
-    label: "Lunas",
-    color: "hsl(var(--success))",
   },
 };
 
@@ -114,13 +96,11 @@ export default function RingkasanPage() {
     try {
       const rtRwPairs = penagihWilayah.map(w => ({ rt: w.rt, rw: w.rw }));
       
-      // Get anggota in penagih wilayah
       const { data: anggotaData } = await supabase
         .from('anggota')
         .select('id, no_kk, rt, rw')
         .eq('status', 'aktif');
       
-      // Filter by penagih wilayah
       const filteredAnggota = anggotaData?.filter(a => 
         rtRwPairs.some(pair => pair.rt === a.rt && pair.rw === a.rw)
       ) || [];
@@ -138,7 +118,6 @@ export default function RingkasanPage() {
       let totalPembayaranDisetujui = 0;
 
       if (uniqueKKs.length > 0) {
-        // Fetch tagihan
         const { data: tagihanData } = await supabase
           .from('iuran_tagihan')
           .select('*')
@@ -158,7 +137,6 @@ export default function RingkasanPage() {
             .filter(t => t.status === 'lunas')
             .reduce((sum, t) => sum + t.nominal, 0);
 
-          // Generate monthly data for chart (last 6 months)
           const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
           const now = new Date();
           const monthlyStats: MonthlyData[] = [];
@@ -180,7 +158,6 @@ export default function RingkasanPage() {
           setMonthlyData(monthlyStats);
         }
 
-        // Fetch pembayaran by this penagih
         const { data: pembayaranData } = await supabase
           .from('iuran_pembayaran')
           .select('*')
@@ -228,7 +205,6 @@ export default function RingkasanPage() {
     fetchStats();
   }, [fetchStats]);
 
-  // Realtime subscription
   useEffect(() => {
     if (!user) return;
 
@@ -243,7 +219,6 @@ export default function RingkasanPage() {
     };
   }, [user, fetchStats]);
 
-  // Pie chart data
   const pieData = [
     { name: 'Belum Bayar', value: stats.tagihanBelumBayar, color: 'hsl(var(--destructive))' },
     { name: 'Menunggu', value: stats.tagihanMenungguAdmin, color: 'hsl(var(--warning))' },
@@ -254,147 +229,170 @@ export default function RingkasanPage() {
 
   if (loading) {
     return (
-      <PenagihLayout>
-        <div className="space-y-6">
-          <Skeleton className="h-10 w-48" />
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-32" />)}
+      <PenagihLayout title="Ringkasan">
+        <div className="space-y-4">
+          <Skeleton className="h-32 w-full rounded-xl" />
+          <div className="grid grid-cols-2 gap-3">
+            {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <Skeleton className="h-80" />
-            <Skeleton className="h-80" />
-          </div>
+          <Skeleton className="h-64 rounded-xl" />
         </div>
       </PenagihLayout>
     );
   }
 
   return (
-    <PenagihLayout>
-      <PageHeader 
-        title="Ringkasan" 
-        description="Statistik lengkap dan visualisasi data wilayah Anda"
-      />
-
-      {penagihWilayah.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <MapPin className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="font-semibold text-lg mb-2">Belum Ada Wilayah</h3>
-            <p className="text-muted-foreground">
-              Anda belum ditugaskan ke wilayah manapun. Hubungi admin untuk mendapatkan akses.
-            </p>
+    <PenagihLayout title="Ringkasan">
+      <div className="space-y-4">
+        {/* Header Card */}
+        <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 rounded-full bg-primary/20">
+                <Home className="h-8 w-8 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold">Ringkasan Statistik</h2>
+                <p className="text-sm text-muted-foreground">Visualisasi data wilayah Anda</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
-      ) : (
-        <div className="space-y-6">
-          {/* Wilayah Info */}
+
+        {penagihWilayah.length === 0 ? (
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <MapPin className="h-5 w-5" />
-                Wilayah Anda
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-2">
-                {penagihWilayah.map((w, idx) => (
-                  <span 
-                    key={idx}
-                    className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-medium"
-                  >
-                    RT {w.rt} / RW {w.rw}
-                  </span>
-                ))}
-              </div>
+            <CardContent className="py-12 text-center">
+              <MapPin className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="font-semibold text-lg mb-2">Belum Ada Wilayah</h3>
+              <p className="text-muted-foreground">
+                Anda belum ditugaskan ke wilayah manapun. Hubungi admin.
+              </p>
             </CardContent>
           </Card>
+        ) : (
+          <>
+            {/* Wilayah Badge */}
+            <div className="flex flex-wrap gap-2">
+              {penagihWilayah.map((w, idx) => (
+                <span 
+                  key={idx}
+                  className="px-3 py-1.5 bg-primary/10 text-primary rounded-full text-sm font-medium inline-flex items-center gap-1"
+                >
+                  <MapPin className="h-3 w-3" />
+                  RT {w.rt} / RW {w.rw}
+                </span>
+              ))}
+            </div>
 
-          {/* Main Stats Grid */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard
-              title="Total KK"
-              value={stats.totalKK}
-              icon={Users}
-              description={`${stats.totalAnggota} anggota`}
-            />
-            <StatCard
-              title="Tagihan Aktif"
-              value={stats.tagihanBelumBayar}
-              icon={AlertCircle}
-              description={formatCurrency(stats.nominalBelumBayar)}
-              className="border-destructive/20"
-              iconClassName="bg-destructive/10"
-            />
-            <StatCard
-              title="Menunggu Verifikasi"
-              value={stats.tagihanMenungguAdmin}
-              icon={Clock}
-              description={formatCurrency(stats.nominalMenungguAdmin)}
-              className="border-warning/20"
-              iconClassName="bg-warning/10"
-            />
-            <StatCard
-              title="Lunas"
-              value={stats.tagihanLunas}
-              icon={CheckCircle}
-              description={formatCurrency(stats.nominalLunas)}
-              className="border-success/20"
-              iconClassName="bg-success/10"
-            />
-          </div>
+            {/* Stats Grid */}
+            <div className="grid grid-cols-2 gap-3">
+              <Card className="border-destructive/20 bg-gradient-to-br from-destructive/5 to-destructive/10">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-destructive/20">
+                      <AlertCircle className="h-5 w-5 text-destructive" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Belum Bayar</p>
+                      <p className="font-bold text-lg">{stats.tagihanBelumBayar}</p>
+                      <p className="text-xs text-destructive font-medium">{formatCurrency(stats.nominalBelumBayar)}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-          {/* Collection Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <StatCard
-              title="Terkumpul Hari Ini"
-              value={formatCurrency(stats.uangTerkumpulHariIni)}
-              icon={TrendingUp}
-              description="Sudah disetujui admin"
-              className="border-success/20"
-              iconClassName="bg-success/10"
-            />
-            <StatCard
-              title="Terkumpul Bulan Ini"
-              value={formatCurrency(stats.uangTerkumpulBulanIni)}
-              icon={Calendar}
-              description="Sudah disetujui admin"
-              className="border-primary/20"
-              iconClassName="bg-primary/10"
-            />
-            <StatCard
-              title="Total Terkumpul"
-              value={formatCurrency(stats.totalPembayaranDisetujui)}
-              icon={Wallet}
-              description="Sepanjang waktu"
-              className="border-success/20 bg-success/5"
-              iconClassName="bg-success/10"
-            />
-          </div>
+              <Card className="border-warning/20 bg-gradient-to-br from-warning/5 to-warning/10">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-warning/20">
+                      <Clock className="h-5 w-5 text-warning" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Menunggu</p>
+                      <p className="font-bold text-lg">{stats.tagihanMenungguAdmin}</p>
+                      <p className="text-xs text-warning font-medium">{formatCurrency(stats.nominalMenungguAdmin)}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-          {/* Charts */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Bar Chart - Monthly Trend */}
+              <Card className="border-success/20 bg-gradient-to-br from-success/5 to-success/10">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-success/20">
+                      <CheckCircle className="h-5 w-5 text-success" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Lunas</p>
+                      <p className="font-bold text-lg">{stats.tagihanLunas}</p>
+                      <p className="text-xs text-success font-medium">{formatCurrency(stats.nominalLunas)}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-primary/20">
+                      <Users className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Total KK</p>
+                      <p className="font-bold text-lg">{stats.totalKK}</p>
+                      <p className="text-xs text-primary font-medium">{stats.totalAnggota} anggota</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Collection Stats */}
+            <div className="grid grid-cols-3 gap-2">
+              <Card className="bg-success/5 border-success/20">
+                <CardContent className="p-3 text-center">
+                  <TrendingUp className="h-5 w-5 text-success mx-auto" />
+                  <p className="text-sm font-bold text-success mt-1">{formatCurrency(stats.uangTerkumpulHariIni)}</p>
+                  <p className="text-[10px] text-muted-foreground">Hari Ini</p>
+                </CardContent>
+              </Card>
+              <Card className="bg-primary/5 border-primary/20">
+                <CardContent className="p-3 text-center">
+                  <Calendar className="h-5 w-5 text-primary mx-auto" />
+                  <p className="text-sm font-bold text-primary mt-1">{formatCurrency(stats.uangTerkumpulBulanIni)}</p>
+                  <p className="text-[10px] text-muted-foreground">Bulan Ini</p>
+                </CardContent>
+              </Card>
+              <Card className="bg-success/5 border-success/20">
+                <CardContent className="p-3 text-center">
+                  <Wallet className="h-5 w-5 text-success mx-auto" />
+                  <p className="text-sm font-bold text-success mt-1">{formatCurrency(stats.totalPembayaranDisetujui)}</p>
+                  <p className="text-[10px] text-muted-foreground">Total</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Charts */}
             <Card>
-              <CardHeader>
+              <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-base">
                   <BarChart3 className="h-5 w-5" />
-                  Tren Tagihan 6 Bulan Terakhir
+                  Tren 6 Bulan Terakhir
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {monthlyData.length > 0 ? (
-                  <ChartContainer config={chartConfig} className="h-[280px] w-full">
+                  <ChartContainer config={chartConfig} className="h-[200px] w-full">
                     <BarChart data={monthlyData}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                       <XAxis 
                         dataKey="bulan" 
-                        tick={{ fontSize: 12 }}
+                        tick={{ fontSize: 10 }}
                         tickLine={false}
                         axisLine={false}
                       />
                       <YAxis 
-                        tick={{ fontSize: 12 }}
+                        tick={{ fontSize: 10 }}
                         tickLine={false}
                         axisLine={false}
                         tickFormatter={(value) => `${(value / 1000000).toFixed(0)}jt`}
@@ -419,36 +417,34 @@ export default function RingkasanPage() {
                     </BarChart>
                   </ChartContainer>
                 ) : (
-                  <div className="h-[280px] flex items-center justify-center text-muted-foreground">
-                    Belum ada data tagihan
+                  <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+                    Belum ada data
                   </div>
                 )}
               </CardContent>
             </Card>
 
-            {/* Pie Chart - Status Distribution */}
+            {/* Pie Chart */}
             <Card>
-              <CardHeader>
+              <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-base">
                   <PieChartIcon className="h-5 w-5" />
-                  Distribusi Status Tagihan
+                  Distribusi Status
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {totalTagihan > 0 ? (
-                  <div className="h-[280px] flex flex-col items-center justify-center">
-                    <ResponsiveContainer width="100%" height={200}>
+                  <div className="flex flex-col items-center">
+                    <ResponsiveContainer width="100%" height={180}>
                       <PieChart>
                         <Pie
                           data={pieData}
                           cx="50%"
                           cy="50%"
-                          innerRadius={50}
-                          outerRadius={80}
+                          innerRadius={40}
+                          outerRadius={70}
                           paddingAngle={2}
                           dataKey="value"
-                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                          labelLine={false}
                         >
                           {pieData.map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={entry.color} />
@@ -462,14 +458,14 @@ export default function RingkasanPage() {
                         />
                       </PieChart>
                     </ResponsiveContainer>
-                    <div className="flex flex-wrap justify-center gap-4 mt-4">
+                    <div className="flex flex-wrap justify-center gap-3 mt-2">
                       {pieData.map((entry, index) => (
-                        <div key={index} className="flex items-center gap-2">
+                        <div key={index} className="flex items-center gap-1.5">
                           <div 
-                            className="w-3 h-3 rounded-full" 
+                            className="w-2.5 h-2.5 rounded-full" 
                             style={{ backgroundColor: entry.color }}
                           />
-                          <span className="text-sm text-muted-foreground">
+                          <span className="text-xs text-muted-foreground">
                             {entry.name}: {entry.value}
                           </span>
                         </div>
@@ -477,39 +473,15 @@ export default function RingkasanPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="h-[280px] flex items-center justify-center text-muted-foreground">
-                    Belum ada data tagihan
+                  <div className="h-[180px] flex items-center justify-center text-muted-foreground">
+                    Belum ada data
                   </div>
                 )}
               </CardContent>
             </Card>
-          </div>
-
-          {/* Performance Summary */}
-          <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
-            <CardContent className="p-6">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-                <div>
-                  <p className="text-3xl font-bold text-primary">{stats.totalKK}</p>
-                  <p className="text-sm text-muted-foreground">KK Dikelola</p>
-                </div>
-                <div>
-                  <p className="text-3xl font-bold text-destructive">{stats.tagihanBelumBayar}</p>
-                  <p className="text-sm text-muted-foreground">Belum Bayar</p>
-                </div>
-                <div>
-                  <p className="text-3xl font-bold text-warning">{stats.tagihanMenungguAdmin}</p>
-                  <p className="text-sm text-muted-foreground">Menunggu Verifikasi</p>
-                </div>
-                <div>
-                  <p className="text-3xl font-bold text-success">{stats.tagihanLunas}</p>
-                  <p className="text-sm text-muted-foreground">Sudah Lunas</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+          </>
+        )}
+      </div>
     </PenagihLayout>
   );
 }
