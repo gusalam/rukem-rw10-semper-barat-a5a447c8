@@ -56,39 +56,54 @@ export default function AdminDashboard() {
 
   const fetchDashboardData = useCallback(async () => {
     try {
-      // Fetch anggota stats
-      const { data: anggotaData, count: totalAnggota } = await supabase
-        .from('anggota')
-        .select('*', { count: 'exact' });
-
-      // Filter anggota aktif
-      const anggotaAktif = anggotaData?.filter(a => a.status === 'aktif') || [];
+      // === GUNAKAN COUNT LANGSUNG DARI DATABASE (tidak terbatas limit 1000) ===
       
-      // PENTING: Hitung KK unik HANYA dari anggota dengan status aktif
-      // Tidak bergantung pada hubungan_kk = 'Kepala Keluarga'
-      const uniqueKK = new Set(anggotaAktif.map(a => a.no_kk));
+      // Count total anggota
+      const { count: totalAnggota } = await supabase
+        .from('anggota')
+        .select('*', { count: 'exact', head: true });
+
+      // Count anggota aktif
+      const { count: countAnggotaAktif } = await supabase
+        .from('anggota')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'aktif');
+
+      // Count KK unik dari anggota aktif
+      const { data: kkData } = await supabase
+        .from('anggota')
+        .select('no_kk')
+        .eq('status', 'aktif');
+      const uniqueKK = new Set(kkData?.map(a => a.no_kk) || []);
       const totalKK = uniqueKK.size;
 
       // === DETEKSI DATA BERMASALAH ===
-      // 1. KK tanpa Kepala Keluarga
-      const kkWithKepala = new Set(
-        anggotaAktif
-          .filter(a => a.hubungan_kk === 'Kepala Keluarga')
-          .map(a => a.no_kk)
-      );
+      // Fetch KK dengan Kepala Keluarga untuk validasi
+      const { data: kepalaData } = await supabase
+        .from('anggota')
+        .select('no_kk')
+        .eq('status', 'aktif')
+        .eq('hubungan_kk', 'Kepala Keluarga');
+      const kkWithKepala = new Set(kepalaData?.map(a => a.no_kk) || []);
       const kkTanpaKepala = [...uniqueKK].filter(kk => !kkWithKepala.has(kk)).length;
 
-      // 2. Anggota tanpa status
-      const anggotaTanpaStatus = anggotaData?.filter(a => !a.status).length || 0;
+      // Count anggota tanpa status (null)
+      const { count: anggotaTanpaStatus } = await supabase
+        .from('anggota')
+        .select('*', { count: 'exact', head: true })
+        .is('status', null);
 
-      // 3. Anggota dengan data tidak lengkap (cek field penting)
-      const anggotaDataTidakLengkap = anggotaData?.filter(a => 
+      // Count anggota dengan data tidak lengkap
+      const { data: incompleteData } = await supabase
+        .from('anggota')
+        .select('id, nik, no_kk, nama_lengkap, alamat, no_hp, hubungan_kk');
+      const anggotaDataTidakLengkap = incompleteData?.filter(a => 
         !a.nik || !a.no_kk || !a.nama_lengkap || !a.alamat || !a.no_hp || !a.hubungan_kk
       ).length || 0;
 
       setDataIssues({
         kkTanpaKepala,
-        anggotaTanpaStatus,
+        anggotaTanpaStatus: anggotaTanpaStatus || 0,
         anggotaDataTidakLengkap,
       });
 
@@ -126,7 +141,7 @@ export default function AdminDashboard() {
       setStats({
         totalAnggota: totalAnggota || 0,
         totalKK,
-        anggotaAktif: anggotaAktif.length,
+        anggotaAktif: countAnggotaAktif || 0,
         totalTagihanBulanIni,
         totalLunas,
         saldoKas,
