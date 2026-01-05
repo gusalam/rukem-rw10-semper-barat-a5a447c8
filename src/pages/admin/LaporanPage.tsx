@@ -37,6 +37,7 @@ export default function LaporanPage() {
   const [expandedKK, setExpandedKK] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [selectedPeriode, setSelectedPeriode] = useState<string>('all');
+  const [selectedStatusAnggota, setSelectedStatusAnggota] = useState<string>('all');
 
   // Generate available periods from tagihan data
   const availablePeriodes = useMemo(() => {
@@ -599,16 +600,50 @@ export default function LaporanPage() {
 
         <TabsContent value="anggota" className="mt-4">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-base">Laporan Anggota</CardTitle>
-              <ExportButtons
-                onExportPDF={() => exportToPDF(anggotaList, anggotaExportColumns, 'Laporan Data Anggota RUKEM', 'laporan-anggota')}
-                onExportExcel={() => exportToExcel(anggotaList, anggotaExportColumns, 'Anggota', 'laporan-anggota')}
-                disabled={anggotaList.length === 0}
-              />
+            <CardHeader className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <CardTitle className="text-base">Laporan Anggota</CardTitle>
+                <ExportButtons
+                  onExportPDF={() => exportToPDF(
+                    selectedStatusAnggota === 'all' ? anggotaList : anggotaList.filter(a => a.status === selectedStatusAnggota), 
+                    anggotaExportColumns, 
+                    `Laporan Data Anggota RUKEM${selectedStatusAnggota !== 'all' ? ` (${selectedStatusAnggota})` : ''}`, 
+                    'laporan-anggota'
+                  )}
+                  onExportExcel={() => exportToExcel(
+                    selectedStatusAnggota === 'all' ? anggotaList : anggotaList.filter(a => a.status === selectedStatusAnggota), 
+                    anggotaExportColumns, 
+                    'Anggota', 
+                    'laporan-anggota'
+                  )}
+                  disabled={anggotaList.length === 0}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <Select value={selectedStatusAnggota} onValueChange={setSelectedStatusAnggota}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Filter Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Status</SelectItem>
+                    <SelectItem value="aktif">Aktif</SelectItem>
+                    <SelectItem value="nonaktif">Nonaktif</SelectItem>
+                    <SelectItem value="meninggal">Meninggal</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Badge variant="secondary">
+                  {selectedStatusAnggota === 'all' 
+                    ? anggotaList.length 
+                    : anggotaList.filter(a => a.status === selectedStatusAnggota).length} data
+                </Badge>
+              </div>
             </CardHeader>
             <CardContent>
-              <DataTable columns={anggotaColumns} data={anggotaList} />
+              <DataTable 
+                columns={anggotaColumns} 
+                data={selectedStatusAnggota === 'all' ? anggotaList : anggotaList.filter(a => a.status === selectedStatusAnggota)} 
+              />
             </CardContent>
           </Card>
         </TabsContent>
