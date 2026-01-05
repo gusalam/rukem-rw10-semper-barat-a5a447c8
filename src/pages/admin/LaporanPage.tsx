@@ -363,36 +363,53 @@ export default function LaporanPage() {
           value={countStats.totalAnggota}
           icon={Users}
           description={`${countStats.anggotaAktif} aktif`}
+          tooltip="Jumlah semua anggota terdaftar di sistem RUKEM"
         />
         <StatCard
           title="Anggota Aktif"
           value={countStats.anggotaAktif}
           icon={Users}
+          tooltip="Anggota dengan status aktif yang bisa mengikuti iuran"
           iconClassName="bg-success/10"
         />
         <StatCard
-          title="Total KK"
-          value={totalKK}
+          title="KK Aktif (Valid)"
+          value={totalKK - kkTanpaKepala}
           icon={Home}
-          description={kkTanpaKepala > 0 ? `${kkTanpaKepala} tanpa Kepala KK` : 'Dari anggota aktif'}
+          description="Dapat mengikuti iuran"
+          tooltip="KK yang memiliki Kepala Keluarga terdaftar. Hanya KK ini yang bisa mengikuti iuran dan santunan."
           iconClassName="bg-primary/10"
         />
+        {kkTanpaKepala > 0 && (
+          <StatCard
+            title="KK Tanpa Kepala"
+            value={kkTanpaKepala}
+            icon={Home}
+            description="Belum bisa ikut iuran"
+            tooltip="KK ini belum memiliki Kepala Keluarga. Perlu ditambahkan agar bisa mengikuti iuran."
+            iconClassName="bg-warning/10"
+            variant="warning"
+          />
+        )}
         <StatCard
           title="Tagihan Lunas"
           value={totalTagihanLunas}
           icon={Receipt}
+          tooltip="Total tagihan yang sudah dibayar dan diverifikasi"
           iconClassName="bg-success/10"
         />
         <StatCard
           title="Saldo Kas"
           value={formatCurrency(saldoKas)}
           icon={Wallet}
+          tooltip="Total saldo kas RUKEM saat ini"
           iconClassName="bg-info/10"
         />
         <StatCard
           title="Total Santunan"
           value={formatCurrency(totalSantunanDisalurkan)}
           icon={HandHeart}
+          tooltip="Total santunan yang sudah disalurkan ke ahli waris"
           iconClassName="bg-warning/10"
         />
       </div>
