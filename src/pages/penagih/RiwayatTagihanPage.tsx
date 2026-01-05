@@ -38,11 +38,16 @@ export default function RiwayatTagihanPage() {
         .select('id, no_kk, rt, rw, nama_lengkap, status_dalam_kk')
         .eq('status', 'aktif');
       
-      const filteredAnggota = anggotaData?.filter(a => 
+      // Filter hanya Kepala Keluarga dengan RT/RW lengkap di wilayah penagih
+      const kepalaKeluargaList = anggotaData?.filter(a => 
+        a.status_dalam_kk === 'kepala_keluarga' &&
+        a.rt && a.rw &&
         rtRwPairs.some(pair => pair.rt === a.rt && pair.rw === a.rw)
       ) || [];
-
-      const uniqueKKs = [...new Set(filteredAnggota.map(a => a.no_kk))];
+      
+      const validKKs = kepalaKeluargaList.map(k => k.no_kk);
+      const filteredAnggota = anggotaData?.filter(a => validKKs.includes(a.no_kk)) || [];
+      const uniqueKKs = validKKs;
 
       if (uniqueKKs.length === 0) {
         setTagihanList([]);
