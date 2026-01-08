@@ -83,6 +83,8 @@ export default function AnggotaDashboard() {
   const [unreadNotif, setUnreadNotif] = useState(0);
   const [currentMonthStatus, setCurrentMonthStatus] = useState<'belum_bayar' | 'menunggu_admin' | 'lunas' | null>(null);
   const [tagihanMenunggu, setTagihanMenunggu] = useState(0);
+  const [tagihanBelumBayar, setTagihanBelumBayar] = useState(0);
+  const [nominalBelumBayarTotal, setNominalBelumBayarTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const fetchData = useCallback(async () => {
     if (!anggota) return;
@@ -92,7 +94,7 @@ export default function AnggotaDashboard() {
       const now = new Date();
       const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-      const [settingsRes, tagihanRes, kasRes, notifCountRes, pembayaranRes, menungguRes] = await Promise.all([
+      const [settingsRes, tagihanRes, kasRes, notifCountRes, pembayaranRes, menungguRes, belumBayarRes] = await Promise.all([
         supabase.from('pengaturan').select('*').limit(1).maybeSingle(),
         supabase
           .from('iuran_tagihan')
@@ -116,6 +118,12 @@ export default function AnggotaDashboard() {
           .select('*', { count: 'exact', head: true })
           .eq('no_kk', anggota.no_kk)
           .eq('status', 'menunggu_admin'),
+        // Get count and total nominal of tagihan with belum_bayar status for this KK
+        supabase
+          .from('iuran_tagihan')
+          .select('nominal')
+          .eq('no_kk', anggota.no_kk)
+          .eq('status', 'belum_bayar'),
       ]);
       
       setPengaturan(settingsRes.data as Pengaturan);
@@ -131,6 +139,11 @@ export default function AnggotaDashboard() {
       
       // Set tagihan menunggu count from database
       setTagihanMenunggu(menungguRes.count || 0);
+      
+      // Set tagihan belum bayar count and total from database
+      const belumBayarData = belumBayarRes.data || [];
+      setTagihanBelumBayar(belumBayarData.length);
+      setNominalBelumBayarTotal(belumBayarData.reduce((sum, t) => sum + (t.nominal || 0), 0));
       
       // Calculate saldo kas
       const saldo = kasRes.data?.reduce((acc, k) => acc + (k.jenis === 'pemasukan' ? k.nominal : -k.nominal), 0) || 0;
@@ -184,13 +197,9 @@ export default function AnggotaDashboard() {
     };
   }, [anggota, fetchData]);
 
-  const belumBayar = tagihanList.filter(t => t.status === 'belum_bayar').length;
-  const menunggu = tagihanMenunggu; // Use database count instead of filtered list
-  const lunas = tagihanList.filter(t => t.status === 'lunas').length;
-
-  const nominalBelumBayar = tagihanList
-    .filter(t => t.status === 'belum_bayar')
-    .reduce((sum, t) => sum + t.nominal, 0);
+  const belumBayar = tagihanBelumBayar; // Use database count
+  const menunggu = tagihanMenunggu; // Use database count
+  const nominalBelumBayar = nominalBelumBayarTotal; // Use database total
 
   if (loading) {
     return (
