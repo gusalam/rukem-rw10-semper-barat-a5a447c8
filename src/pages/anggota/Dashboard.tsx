@@ -82,8 +82,8 @@ export default function AnggotaDashboard() {
   const [totalIuranDibayar, setTotalIuranDibayar] = useState(0);
   const [unreadNotif, setUnreadNotif] = useState(0);
   const [currentMonthStatus, setCurrentMonthStatus] = useState<'belum_bayar' | 'menunggu_admin' | 'lunas' | null>(null);
+  const [tagihanMenunggu, setTagihanMenunggu] = useState(0);
   const [loading, setLoading] = useState(true);
-
   const fetchData = useCallback(async () => {
     if (!anggota) return;
     
@@ -92,7 +92,7 @@ export default function AnggotaDashboard() {
       const now = new Date();
       const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-      const [settingsRes, tagihanRes, kasRes, notifCountRes, pembayaranRes] = await Promise.all([
+      const [settingsRes, tagihanRes, kasRes, notifCountRes, pembayaranRes, menungguRes] = await Promise.all([
         supabase.from('pengaturan').select('*').limit(1).maybeSingle(),
         supabase
           .from('iuran_tagihan')
@@ -110,6 +110,12 @@ export default function AnggotaDashboard() {
           .from('iuran_pembayaran')
           .select('*, iuran_tagihan(*)')
           .eq('status', 'disetujui'),
+        // Get count of tagihan with menunggu_admin status for this KK
+        supabase
+          .from('iuran_tagihan')
+          .select('*', { count: 'exact', head: true })
+          .eq('no_kk', anggota.no_kk)
+          .eq('status', 'menunggu_admin'),
       ]);
       
       setPengaturan(settingsRes.data as Pengaturan);
@@ -122,6 +128,9 @@ export default function AnggotaDashboard() {
       setCurrentMonthStatus(currentMonthTagihan?.status as any || null);
       
       setUnreadNotif(notifCountRes.count || 0);
+      
+      // Set tagihan menunggu count from database
+      setTagihanMenunggu(menungguRes.count || 0);
       
       // Calculate saldo kas
       const saldo = kasRes.data?.reduce((acc, k) => acc + (k.jenis === 'pemasukan' ? k.nominal : -k.nominal), 0) || 0;
@@ -176,7 +185,7 @@ export default function AnggotaDashboard() {
   }, [anggota, fetchData]);
 
   const belumBayar = tagihanList.filter(t => t.status === 'belum_bayar').length;
-  const menunggu = tagihanList.filter(t => t.status === 'menunggu_admin').length;
+  const menunggu = tagihanMenunggu; // Use database count instead of filtered list
   const lunas = tagihanList.filter(t => t.status === 'lunas').length;
 
   const nominalBelumBayar = tagihanList
