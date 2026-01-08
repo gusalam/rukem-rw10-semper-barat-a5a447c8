@@ -171,6 +171,11 @@ export default function PenagihDashboard() {
           const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
           const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
+          // Count pending payments (menunggu_admin) - these are payments waiting for admin approval
+          const pendingPayments = pembayaranData.filter((p: any) => p.status === 'menunggu_admin');
+          tagihanMenungguAdmin = pendingPayments.length;
+          nominalMenungguAdmin = pendingPayments.reduce((sum: number, p: any) => sum + p.nominal, 0);
+
           // Calculate money collected (only approved payments)
           const approvedPayments = pembayaranData.filter((p: any) => p.status === 'disetujui');
           
