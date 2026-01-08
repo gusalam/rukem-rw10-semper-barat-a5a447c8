@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { Badge } from '@/components/ui/badge';
 import { ImageUpload } from '@/components/ui/image-upload';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -33,6 +34,7 @@ import { getErrorMessage } from '@/lib/error-messages';
 
 interface TagihanWithKK extends IuranTagihan {
   kepala_keluarga?: Anggota;
+  pembayaran?: { id: string; status: string; tanggal_bayar: string }[];
 }
 
 // Generate period options (last 24 months)
@@ -114,10 +116,17 @@ export default function PenagihTagihanPage() {
         return;
       }
 
-      // Get tagihan for these KKs
+      // Get tagihan for these KKs with pembayaran data
       const { data: tagihanData } = await supabase
         .from('iuran_tagihan')
-        .select('*')
+        .select(`
+          *,
+          iuran_pembayaran (
+            id,
+            status,
+            tanggal_bayar
+          )
+        `)
         .in('no_kk', uniqueKKs)
         .order('jatuh_tempo', { ascending: false });
 
@@ -126,7 +135,11 @@ export default function PenagihTagihanPage() {
         const kepala = filteredAnggota.find(a => 
           a.no_kk === t.no_kk && a.status_dalam_kk === 'kepala_keluarga'
         ) || filteredAnggota.find(a => a.no_kk === t.no_kk);
-        return { ...t, kepala_keluarga: kepala } as TagihanWithKK;
+        return { 
+          ...t, 
+          kepala_keluarga: kepala,
+          pembayaran: t.iuran_pembayaran || [],
+        } as TagihanWithKK;
       });
 
       setTagihanList(tagihanWithKK);
@@ -244,7 +257,20 @@ export default function PenagihTagihanPage() {
     {
       key: 'status',
       header: 'Status',
-      cell: (item: TagihanWithKK) => <StatusBadge status={item.status} />,
+      cell: (item: TagihanWithKK) => {
+        const hasPendingPayment = item.pembayaran?.some(p => p.status === 'menunggu_admin');
+        return (
+          <div className="flex flex-col gap-1">
+            <StatusBadge status={item.status} />
+            {hasPendingPayment && item.status !== 'lunas' && (
+              <Badge variant="outline" className="text-[10px] bg-yellow-500/10 text-yellow-600 border-yellow-500/30 w-fit">
+                <Clock className="h-3 w-3 mr-1" />
+                Menunggu
+              </Badge>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: 'actions',
