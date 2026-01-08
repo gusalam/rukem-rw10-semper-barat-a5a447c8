@@ -123,15 +123,18 @@ export default function RingkasanPage() {
           .select('*')
           .in('no_kk', uniqueKKs);
 
+        // Fetch pending payments (menunggu_admin) from iuran_pembayaran
+        const { data: pendingPembayaranData } = await supabase
+          .from('iuran_pembayaran')
+          .select('id, tagihan_id, nominal, status')
+          .eq('penagih_user_id', user.id)
+          .eq('status', 'menunggu_admin');
+
         if (tagihanData) {
           tagihanBelumBayar = tagihanData.filter(t => t.status === 'belum_bayar').length;
-          tagihanMenungguAdmin = tagihanData.filter(t => t.status === 'menunggu_admin').length;
           tagihanLunas = tagihanData.filter(t => t.status === 'lunas').length;
           nominalBelumBayar = tagihanData
             .filter(t => t.status === 'belum_bayar')
-            .reduce((sum, t) => sum + t.nominal, 0);
-          nominalMenungguAdmin = tagihanData
-            .filter(t => t.status === 'menunggu_admin')
             .reduce((sum, t) => sum + t.nominal, 0);
           nominalLunas = tagihanData
             .filter(t => t.status === 'lunas')
@@ -156,6 +159,12 @@ export default function RingkasanPage() {
           }
           
           setMonthlyData(monthlyStats);
+        }
+
+        // Calculate pending stats from iuran_pembayaran
+        if (pendingPembayaranData) {
+          tagihanMenungguAdmin = pendingPembayaranData.length;
+          nominalMenungguAdmin = pendingPembayaranData.reduce((sum, p) => sum + p.nominal, 0);
         }
 
         const { data: pembayaranData } = await supabase
