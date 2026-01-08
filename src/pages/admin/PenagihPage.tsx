@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { AdminDashboardSkeleton } from '@/components/ui/admin-loading-skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { Switch } from '@/components/ui/switch';
+import { PenagihRiwayatDialog } from '@/components/admin/PenagihRiwayatDialog';
 import {
   Dialog,
   DialogContent,
@@ -27,7 +28,7 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, Search, Users, MapPin, Trash2, Edit, UserCheck, Eye, EyeOff } from 'lucide-react';
+import { Plus, Search, Users, MapPin, Trash2, Edit, UserCheck, Eye, EyeOff, History } from 'lucide-react';
 import type { PenagihWilayah } from '@/types/database';
 import { getErrorMessage, StandardMessages } from '@/lib/error-messages';
 
@@ -57,9 +58,11 @@ export default function PenagihPage() {
   const [wilayahDialogOpen, setWilayahDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletePenagihDialogOpen, setDeletePenagihDialogOpen] = useState(false);
+  const [riwayatDialogOpen, setRiwayatDialogOpen] = useState(false);
   const [selectedPenagih, setSelectedPenagih] = useState<PenagihWithWilayah | null>(null);
   const [selectedWilayah, setSelectedWilayah] = useState<PenagihWilayah | null>(null);
   const [penagihToDelete, setPenagihToDelete] = useState<PenagihWithWilayah | null>(null);
+  const [penagihForRiwayat, setPenagihForRiwayat] = useState<PenagihWithWilayah | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   
   // Available RT/RW options from anggota data
@@ -526,6 +529,11 @@ export default function PenagihPage() {
     setDeletePenagihDialogOpen(true);
   };
 
+  const openRiwayatDialog = (penagih: PenagihWithWilayah) => {
+    setPenagihForRiwayat(penagih);
+    setRiwayatDialogOpen(true);
+  };
+
   const handleDeletePenagih = async () => {
     if (!penagihToDelete) return;
 
@@ -647,6 +655,15 @@ export default function PenagihPage() {
       header: '',
       cell: (item: PenagihWithWilayah) => (
         <div className="flex gap-1">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => openRiwayatDialog(item)}
+            title="Lihat Riwayat Pembayaran"
+          >
+            <History className="h-4 w-4 mr-1" />
+            Riwayat
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -994,6 +1011,14 @@ export default function PenagihPage() {
         title="Hapus Akun Penagih Permanen"
         description={`Akun penagih "${penagihToDelete?.nama_lengkap}" akan dihapus PERMANEN dan tidak dapat login kembali. Data transaksi pembayaran yang pernah diinput tetap tersimpan untuk keperluan audit dan laporan. Lanjutkan?`}
         loading={submitting}
+      />
+
+      {/* Riwayat Pembayaran Dialog */}
+      <PenagihRiwayatDialog
+        open={riwayatDialogOpen}
+        onOpenChange={setRiwayatDialogOpen}
+        penagihUserId={penagihForRiwayat?.user_id || ''}
+        penagihNama={penagihForRiwayat?.nama_lengkap || ''}
       />
     </AdminLayout>
   );
