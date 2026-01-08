@@ -112,11 +112,10 @@ export default function AnggotaDashboard() {
           .from('iuran_pembayaran')
           .select('*, iuran_tagihan(*)')
           .eq('status', 'disetujui'),
-        // Get count of tagihan with menunggu_admin status for this KK
+        // Get count of pembayaran with menunggu_admin status (RLS already scopes to this KK)
         supabase
-          .from('iuran_tagihan')
-          .select('*', { count: 'exact', head: true })
-          .eq('no_kk', anggota.no_kk)
+          .from('iuran_pembayaran')
+          .select('id', { count: 'exact', head: true })
           .eq('status', 'menunggu_admin'),
         // Get count and total nominal of tagihan with belum_bayar status for this KK
         supabase
@@ -137,7 +136,7 @@ export default function AnggotaDashboard() {
       
       setUnreadNotif(notifCountRes.count || 0);
       
-      // Set tagihan menunggu count from database
+      // Set pembayaran menunggu count from database
       setTagihanMenunggu(menungguRes.count || 0);
       
       // Set tagihan belum bayar count and total from database
