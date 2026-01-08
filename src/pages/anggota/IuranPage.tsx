@@ -235,7 +235,8 @@ export default function AnggotaIuranPage() {
             />
           ) : (
             tagihanList.map((tagihan) => {
-              const lastPembayaran = tagihan.pembayaran?.[0];
+              const lastPembayaran = tagihan.pembayaran?.[tagihan.pembayaran.length - 1];
+              const hasPendingPayment = tagihan.pembayaran?.some(p => p.status === 'menunggu_admin');
 
               return (
                 <Card key={tagihan.id}>
@@ -257,7 +258,16 @@ export default function AnggotaIuranPage() {
                         <StatusBadge status={tagihan.status} />
                       </div>
                     </div>
-                    {lastPembayaran && (
+                    {/* Show pending verification badge based on iuran_pembayaran */}
+                    {hasPendingPayment && tagihan.status !== 'lunas' && (
+                      <div className="mt-3 pt-3 border-t">
+                        <Badge variant="outline" className="text-xs bg-yellow-500/10 text-yellow-600 border-yellow-500/30">
+                          <Clock className="h-3 w-3 mr-1" />
+                          Menunggu Verifikasi Admin
+                        </Badge>
+                      </div>
+                    )}
+                    {lastPembayaran && tagihan.status === 'lunas' && (
                       <div className="mt-3 pt-3 border-t flex items-center gap-2">
                         <Badge variant="outline" className="text-xs capitalize">
                           {lastPembayaran.metode}
