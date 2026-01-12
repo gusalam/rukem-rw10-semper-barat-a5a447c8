@@ -34,6 +34,7 @@ export default function RingkasanKKPage() {
   const [anggotaList, setAnggotaList] = useState<Anggota[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalAnggotaAktif, setTotalAnggotaAktif] = useState(0);
+  const [kkValidCount, setKkValidCount] = useState(0); // Count dari database (akurat)
 
   useEffect(() => {
     fetchData();
@@ -48,6 +49,15 @@ export default function RingkasanKKPage() {
         .eq('status', 'aktif');
 
       setTotalAnggotaAktif(countAnggotaAktif || 0);
+
+      // === COUNT KK VALID langsung dari database (konsisten dengan Dashboard & Laporan) ===
+      const { count: countKKValid } = await supabase
+        .from('anggota')
+        .select('no_kk', { count: 'exact', head: true })
+        .eq('status', 'aktif')
+        .eq('status_dalam_kk', 'kepala_keluarga');
+
+      setKkValidCount(countKKValid || 0);
 
       // Fetch semua data anggota aktif dengan batching
       const allAnggota: Anggota[] = [];
@@ -123,10 +133,10 @@ export default function RingkasanKKPage() {
     );
   }, [anggotaList]);
 
-  // Statistics
+  // Statistics - menggunakan count dari database untuk KK Valid (konsisten dengan Dashboard & Laporan)
   const totalKKSemua = kkSummaryList.length;
-  const kkAktifValid = kkSummaryList.filter(kk => kk.status_kk === 'valid').length;
-  const kkTanpaKepala = kkSummaryList.filter(kk => kk.status_kk === 'tanpa_kepala').length;
+  const kkAktifValid = kkValidCount; // Dari database langsung, bukan dari kkSummaryList
+  const kkTanpaKepala = totalKKSemua - kkValidCount; // Selisih antara total KK dan KK Valid
   const totalAnggota = anggotaList.length;
 
   // Chart data
