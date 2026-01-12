@@ -45,6 +45,7 @@ export default function TagihanPage() {
   const [tagihanList, setTagihanList] = useState<IuranTagihan[]>([]);
   const [anggotaList, setAnggotaList] = useState<Anggota[]>([]);
   const [pengaturan, setPengaturan] = useState<Pengaturan | null>(null);
+  const [kkValidCount, setKkValidCount] = useState(0); // Count dari database (akurat)
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -70,18 +71,43 @@ export default function TagihanPage() {
 
   const fetchData = async () => {
     try {
+      // === COUNT KK VALID LANGSUNG DARI DATABASE (tidak terbatas limit 1000) ===
+      const { count: kkValidFromDB } = await supabase
+        .from('anggota')
+        .select('no_kk', { count: 'exact', head: true })
+        .eq('status', 'aktif')
+        .eq('status_dalam_kk', 'kepala_keluarga');
+      
+      setKkValidCount(kkValidFromDB || 0);
+
       // Fetch tagihan with kepala keluarga info
       const { data: tagihanData } = await supabase
         .from('iuran_tagihan')
         .select('*')
         .order('created_at', { ascending: false });
 
-      // Fetch anggota data to join with tagihan
-      const { data: anggotaData } = await supabase
-        .from('anggota')
-        .select('*')
-        .eq('status', 'aktif')
-        .order('nama_lengkap');
+      // Fetch anggota data dengan batch fetching untuk menghindari limit 1000
+      let allAnggota: Anggota[] = [];
+      let page = 0;
+      const pageSize = 1000;
+      let hasMore = true;
+      
+      while (hasMore) {
+        const { data: anggotaBatch } = await supabase
+          .from('anggota')
+          .select('*')
+          .eq('status', 'aktif')
+          .order('nama_lengkap')
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+        
+        if (anggotaBatch && anggotaBatch.length > 0) {
+          allAnggota = allAnggota.concat(anggotaBatch as Anggota[]);
+          hasMore = anggotaBatch.length === pageSize;
+          page++;
+        } else {
+          hasMore = false;
+        }
+      }
 
       const { data: pengaturanData } = await supabase
         .from('pengaturan')
@@ -91,14 +117,14 @@ export default function TagihanPage() {
 
       // Map kepala keluarga to tagihan (menggunakan status_dalam_kk)
       const tagihanWithKK = (tagihanData || []).map(tagihan => {
-        const kepala = anggotaData?.find(
+        const kepala = allAnggota.find(
           a => a.no_kk === tagihan.no_kk && a.status_dalam_kk === 'kepala_keluarga'
-        ) || anggotaData?.find(a => a.no_kk === tagihan.no_kk);
+        ) || allAnggota.find(a => a.no_kk === tagihan.no_kk);
         return { ...tagihan, kepala_keluarga: kepala };
       });
 
       setTagihanList(tagihanWithKK as IuranTagihan[]);
-      setAnggotaList(anggotaData as Anggota[] || []);
+      setAnggotaList(allAnggota);
       setPengaturan(pengaturanData as Pengaturan);
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -583,7 +609,7 @@ export default function TagihanPage() {
                   />
                 </div>
                 <div className="bg-muted p-3 rounded-lg text-sm space-y-1">
-                  <p><strong>KK Valid (punya Kepala):</strong> {kkList.length} KK</p>
+                  <p><strong>KK Valid (punya Kepala):</strong> {kkValidCount} KK</p>
                   <p><strong>Nominal per KK:</strong> {formatCurrency(pengaturan?.nominal_iuran || 0)}</p>
                   <p className="text-xs text-muted-foreground mt-2">
                     * Tagihan hanya dibuat untuk KK yang sudah memiliki Kepala Keluarga terdaftar
