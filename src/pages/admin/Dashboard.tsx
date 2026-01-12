@@ -20,6 +20,7 @@ import type { IuranTagihan, IuranPembayaran, Anggota } from '@/types/database';
 interface DashboardStats {
   totalAnggota: number;
   totalKK: number;
+  kkValid: number;
   anggotaAktif: number;
   totalTagihanBulanIni: number;
   totalLunas: number;
@@ -37,6 +38,7 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState<DashboardStats>({
     totalAnggota: 0,
     totalKK: 0,
+    kkValid: 0,
     anggotaAktif: 0,
     totalTagihanBulanIni: 0,
     totalLunas: 0,
@@ -70,23 +72,42 @@ export default function AdminDashboard() {
         .select('*', { count: 'exact', head: true })
         .eq('status', 'aktif');
 
-      // Count KK unik dari anggota aktif
-      const { data: kkData } = await supabase
+      // === COUNT KK VALID LANGSUNG DARI DATABASE ===
+      // KK Valid = KK yang memiliki kepala_keluarga aktif (count exact dari DB)
+      const { count: kkValidCount } = await supabase
         .from('anggota')
-        .select('no_kk')
-        .eq('status', 'aktif');
-      const uniqueKK = new Set(kkData?.map(a => a.no_kk) || []);
-      const totalKK = uniqueKK.size;
-
-      // === DETEKSI DATA BERMASALAH ===
-      // Fetch KK dengan Kepala Keluarga untuk validasi (menggunakan status_dalam_kk)
-      const { data: kepalaData } = await supabase
-        .from('anggota')
-        .select('no_kk')
+        .select('no_kk', { count: 'exact', head: true })
         .eq('status', 'aktif')
         .eq('status_dalam_kk', 'kepala_keluarga');
-      const kkWithKepala = new Set(kepalaData?.map(a => a.no_kk) || []);
-      const kkTanpaKepala = [...uniqueKK].filter(kk => !kkWithKepala.has(kk)).length;
+
+      // Total KK = count distinct no_kk dari anggota aktif
+      // Karena kita tidak bisa count distinct, kita fetch dan hitung di client
+      // tapi menggunakan batch fetch untuk menghindari limit 1000
+      let allKKs: string[] = [];
+      let page = 0;
+      const pageSize = 1000;
+      let hasMore = true;
+      
+      while (hasMore) {
+        const { data: kkBatch } = await supabase
+          .from('anggota')
+          .select('no_kk')
+          .eq('status', 'aktif')
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+        
+        if (kkBatch && kkBatch.length > 0) {
+          allKKs = allKKs.concat(kkBatch.map(a => a.no_kk));
+          hasMore = kkBatch.length === pageSize;
+          page++;
+        } else {
+          hasMore = false;
+        }
+      }
+      
+      const uniqueKK = new Set(allKKs);
+      const totalKK = uniqueKK.size;
+      const kkValid = kkValidCount || 0;
+      const kkTanpaKepala = totalKK - kkValid;
 
       // Count anggota tanpa status (null)
       const { count: anggotaTanpaStatus } = await supabase
@@ -142,11 +163,17 @@ export default function AdminDashboard() {
       setStats({
         totalAnggota: totalAnggota || 0,
         totalKK,
+        kkValid,
         anggotaAktif: countAnggotaAktif || 0,
         totalTagihanBulanIni,
         totalLunas,
         saldoKas,
         pendingVerifikasi: pendingCount || 0,
+      });
+      setDataIssues({
+        kkTanpaKepala,
+        anggotaTanpaStatus: anggotaTanpaStatus || 0,
+        anggotaDataTidakLengkap,
       });
       setPendingPayments(pendingData as IuranPembayaran[] || []);
       setRecentTagihan(recentData as IuranTagihan[] || []);
@@ -249,7 +276,7 @@ export default function AdminDashboard() {
         />
         <StatCard
           title="KK Aktif (Valid)"
-          value={stats.totalKK - dataIssues.kkTanpaKepala}
+          value={stats.kkValid}
           icon={Home}
           description="Dapat mengikuti iuran"
           tooltip="KK yang memiliki Kepala Keluarga terdaftar. Hanya KK ini yang bisa mengikuti iuran dan santunan."
