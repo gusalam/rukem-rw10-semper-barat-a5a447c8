@@ -45,6 +45,8 @@ export default function LaporanPage() {
     anggotaAktif: 0,
     anggotaNonaktif: 0,
     anggotaMeninggal: 0,
+    kkValid: 0,
+    totalKK: 0,
   });
 
   // Generate available periods from tagihan data
@@ -86,6 +88,7 @@ export default function LaporanPage() {
         anggotaAktifRes,
         anggotaNonaktifRes,
         anggotaMeninggalRes,
+        kkValidRes,
         anggotaRes, 
         tagihanRes, 
         pembayaranRes, 
@@ -96,6 +99,8 @@ export default function LaporanPage() {
         supabase.from('anggota').select('*', { count: 'exact', head: true }).eq('status', 'aktif'),
         supabase.from('anggota').select('*', { count: 'exact', head: true }).eq('status', 'nonaktif'),
         supabase.from('anggota').select('*', { count: 'exact', head: true }).eq('status', 'meninggal'),
+        // KK Valid = count anggota aktif yang status_dalam_kk = 'kepala_keluarga'
+        supabase.from('anggota').select('no_kk', { count: 'exact', head: true }).eq('status', 'aktif').eq('status_dalam_kk', 'kepala_keluarga'),
         supabase.from('anggota').select('*').order('nama_lengkap'),
         supabase.from('iuran_tagihan').select('*').order('jatuh_tempo', { ascending: false }),
         supabase.from('iuran_pembayaran').select('*, tagihan:iuran_tagihan(*)').order('created_at', { ascending: false }),
@@ -103,12 +108,40 @@ export default function LaporanPage() {
         supabase.from('santunan').select('*, anggota(*), kematian(*)').order('created_at', { ascending: false }),
       ]);
 
+      // Hitung total KK unik dari anggota aktif (dengan batch fetching)
+      let allKKs: string[] = [];
+      let page = 0;
+      const pageSize = 1000;
+      let hasMore = true;
+      
+      while (hasMore) {
+        const { data: kkBatch } = await supabase
+          .from('anggota')
+          .select('no_kk')
+          .eq('status', 'aktif')
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+        
+        if (kkBatch && kkBatch.length > 0) {
+          allKKs = allKKs.concat(kkBatch.map(a => a.no_kk));
+          hasMore = kkBatch.length === pageSize;
+          page++;
+        } else {
+          hasMore = false;
+        }
+      }
+      
+      const uniqueKK = new Set(allKKs);
+      const totalKK = uniqueKK.size;
+      const kkValid = kkValidRes.count || 0;
+
       // Set count stats dari database (akurat, tidak terbatas limit)
       setCountStats({
         totalAnggota: totalAnggotaRes.count || 0,
         anggotaAktif: anggotaAktifRes.count || 0,
         anggotaNonaktif: anggotaNonaktifRes.count || 0,
         anggotaMeninggal: anggotaMeninggalRes.count || 0,
+        kkValid,
+        totalKK,
       });
 
       const anggota = anggotaRes.data as Anggota[] || [];
@@ -187,16 +220,12 @@ export default function LaporanPage() {
   };
 
   // PENTING: Gunakan countStats dari database untuk statistik (akurat, tidak terbatas limit 1000)
-  // totalKK dihitung dari no_kk unik anggota aktif
-  const totalKK = kkTagihanReport.length; // kkTagihanReport sudah difilter hanya dari anggota aktif
   const totalTagihanLunas = tagihanList.filter(t => t.status === 'lunas').length;
   const saldoKas = kasList.reduce((acc, k) => acc + (k.jenis === 'pemasukan' ? k.nominal : -k.nominal), 0);
   const totalSantunanDisalurkan = santunanList.filter(s => s.status === 'disalurkan').reduce((acc, s) => acc + s.nominal_akhir, 0);
 
-  // Validasi: Hitung KK yang tidak memiliki Kepala Keluarga (menggunakan status_dalam_kk)
-  const kkTanpaKepala = kkTagihanReport.filter(kk => 
-    !kk.anggota_list.some(a => a.status_dalam_kk === 'kepala_keluarga')
-  ).length;
+  // Hitung KK Tanpa Kepala dari countStats
+  const kkTanpaKepala = countStats.totalKK - countStats.kkValid;
 
   // Export configurations
   const anggotaExportColumns = [
@@ -374,7 +403,7 @@ export default function LaporanPage() {
         />
         <StatCard
           title="KK Aktif (Valid)"
-          value={totalKK - kkTanpaKepala}
+          value={countStats.kkValid}
           icon={Home}
           description="Dapat mengikuti iuran"
           tooltip="KK yang memiliki Kepala Keluarga terdaftar. Hanya KK ini yang bisa mengikuti iuran dan santunan."
