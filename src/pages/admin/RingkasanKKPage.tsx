@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { PageHeader } from '@/components/ui/page-header';
@@ -15,10 +15,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Home, Users, AlertTriangle, CheckCircle2, XCircle, Download, FileText, HelpCircle } from 'lucide-react';
+import { Home, Users, AlertTriangle, CheckCircle2, XCircle, Download, FileText, HelpCircle, Radio, RefreshCw, Wifi, WifiOff } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, Legend } from 'recharts';
 import type { Anggota } from '@/types/database';
 import { exportToPDF, exportToExcel } from '@/lib/export';
+import { useToast } from '@/hooks/use-toast';
 
 interface KKSummary {
   no_kk: string;
@@ -34,15 +35,13 @@ export default function RingkasanKKPage() {
   const [anggotaList, setAnggotaList] = useState<Anggota[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalAnggotaAktif, setTotalAnggotaAktif] = useState(0);
-  const [kkValidCount, setKkValidCount] = useState(0); // Count dari database (akurat)
+  const [kkValidCount, setKkValidCount] = useState(0);
+  const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const { toast } = useToast();
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async (showToast = false) => {
     try {
-      // === COUNT langsung dari database (tidak terbatas limit 1000) ===
       const { count: countAnggotaAktif } = await supabase
         .from('anggota')
         .select('*', { count: 'exact', head: true })
@@ -50,7 +49,6 @@ export default function RingkasanKKPage() {
 
       setTotalAnggotaAktif(countAnggotaAktif || 0);
 
-      // === COUNT KK VALID langsung dari database (konsisten dengan Dashboard & Laporan) ===
       const { count: countKKValid } = await supabase
         .from('anggota')
         .select('no_kk', { count: 'exact', head: true })
@@ -59,7 +57,6 @@ export default function RingkasanKKPage() {
 
       setKkValidCount(countKKValid || 0);
 
-      // Fetch semua data anggota aktif dengan batching
       const allAnggota: Anggota[] = [];
       const batchSize = 1000;
       let offset = 0;
@@ -83,12 +80,63 @@ export default function RingkasanKKPage() {
       }
 
       setAnggotaList(allAnggota);
+      setLastUpdate(new Date());
+      
+      if (showToast) {
+        toast({
+          title: '✓ Data Diperbarui',
+          description: 'Data KK berhasil dimuat ulang.',
+        });
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
+
+  // Initial fetch
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Real-time subscription
+  useEffect(() => {
+    const channel = supabase
+      .channel('ringkasan-kk-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'anggota'
+        },
+        (payload) => {
+          console.log('Realtime update received:', payload);
+          // Refetch data when any change occurs
+          fetchData();
+          toast({
+            title: '🔄 Data Diperbarui',
+            description: `Perubahan terdeteksi pada data anggota (${payload.eventType}).`,
+          });
+        }
+      )
+      .subscribe((status) => {
+        console.log('Realtime subscription status:', status);
+        if (status === 'SUBSCRIBED') {
+          setRealtimeStatus('connected');
+        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+          setRealtimeStatus('disconnected');
+        } else {
+          setRealtimeStatus('connecting');
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchData, toast]);
+
 
   // Build KK summary
   const kkSummaryList = useMemo(() => {
@@ -253,10 +301,65 @@ export default function RingkasanKKPage() {
 
   return (
     <AdminLayout>
-      <PageHeader 
-        title="Ringkasan Data KK" 
-        description="Perbandingan data Kartu Keluarga dan export laporan lengkap"
-      />
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <PageHeader 
+          title="Ringkasan Data KK" 
+          description="Perbandingan data Kartu Keluarga dan export laporan lengkap"
+        />
+        <div className="flex items-center gap-3">
+          {/* Real-time Status Indicator */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                  realtimeStatus === 'connected' 
+                    ? 'bg-success/10 text-success border border-success/30' 
+                    : realtimeStatus === 'connecting'
+                    ? 'bg-warning/10 text-warning border border-warning/30'
+                    : 'bg-destructive/10 text-destructive border border-destructive/30'
+                }`}>
+                  {realtimeStatus === 'connected' ? (
+                    <>
+                      <Radio className="h-3 w-3 animate-pulse" />
+                      <span className="hidden sm:inline">Real-time Aktif</span>
+                      <Wifi className="h-3 w-3 sm:hidden" />
+                    </>
+                  ) : realtimeStatus === 'connecting' ? (
+                    <>
+                      <RefreshCw className="h-3 w-3 animate-spin" />
+                      <span className="hidden sm:inline">Menghubungkan...</span>
+                    </>
+                  ) : (
+                    <>
+                      <WifiOff className="h-3 w-3" />
+                      <span className="hidden sm:inline">Terputus</span>
+                    </>
+                  )}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs">
+                  {realtimeStatus === 'connected' 
+                    ? 'Data akan otomatis diperbarui saat ada perubahan anggota'
+                    : realtimeStatus === 'connecting'
+                    ? 'Sedang menghubungkan ke server real-time...'
+                    : 'Koneksi real-time terputus. Klik Refresh untuk memuat ulang.'}
+                </p>
+                {lastUpdate && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Update terakhir: {lastUpdate.toLocaleTimeString('id-ID')}
+                  </p>
+                )}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          <Button variant="outline" size="sm" onClick={() => fetchData(true)} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
+      </div>
 
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-4 mt-6">
