@@ -67,13 +67,44 @@ export function BulkFixKKTanpaKepalaDialog({
   const [showResults, setShowResults] = useState(false);
   const { toast } = useToast();
 
+  // Priority order for auto-assign: istri > oldest anak > famili > orang_tua > lainnya
+  const getAutoSelectedKepala = (activeMembers: Anggota[]): string | null => {
+    if (activeMembers.length === 0) return null;
+    if (activeMembers.length === 1) return activeMembers[0].id;
+
+    // Priority order
+    const priorityOrder = ['istri', 'anak', 'famili', 'orang_tua', 'lainnya', null];
+    
+    // Find by priority
+    for (const priority of priorityOrder) {
+      const candidates = activeMembers.filter(a => a.status_dalam_kk === priority);
+      
+      if (candidates.length > 0) {
+        // For 'anak', pick the oldest (smallest tanggal_lahir)
+        if (priority === 'anak' && candidates.length > 1) {
+          const sorted = [...candidates].sort((a, b) => {
+            if (!a.tanggal_lahir && !b.tanggal_lahir) return 0;
+            if (!a.tanggal_lahir) return 1;
+            if (!b.tanggal_lahir) return -1;
+            return new Date(a.tanggal_lahir).getTime() - new Date(b.tanggal_lahir).getTime();
+          });
+          return sorted[0].id;
+        }
+        return candidates[0].id;
+      }
+    }
+
+    // Fallback to first member
+    return activeMembers[0].id;
+  };
+
   // Initialize selections when dialog opens
   useEffect(() => {
     if (open && kkTanpaKepala.length > 0) {
       const initialSelections = kkTanpaKepala.map(kk => {
         const activeMembers = kk.anggota.filter(a => a.status === 'aktif');
-        // Auto-select first member if only one active member exists
-        const autoSelected = activeMembers.length === 1 ? activeMembers[0].id : null;
+        // Auto-select based on priority: istri > oldest anak > famili
+        const autoSelected = getAutoSelectedKepala(activeMembers);
         return {
           no_kk: kk.no_kk,
           selectedAnggotaId: autoSelected,

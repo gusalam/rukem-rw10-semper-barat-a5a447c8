@@ -13,8 +13,14 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AdminDashboardSkeleton } from '@/components/ui/admin-loading-skeleton';
 import { KKTanpaKepalaWarning } from '@/components/admin/KKTanpaKepalaWarning';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { formatCurrency, formatDate, formatPeriode } from '@/lib/format';
-import { Users, Receipt, Wallet, Clock, RefreshCw, Home, TrendingUp, AlertTriangle, ArrowRight, Database } from 'lucide-react';
+import { Users, Receipt, Wallet, Clock, RefreshCw, Home, TrendingUp, AlertTriangle, ArrowRight, Database, Radio, Wifi, WifiOff } from 'lucide-react';
 import type { IuranTagihan, IuranPembayaran, Anggota } from '@/types/database';
 
 interface DashboardStats {
@@ -55,6 +61,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [isLive, setIsLive] = useState(false);
+  const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
   const navigate = useNavigate();
 
   const fetchDashboardData = useCallback(async () => {
@@ -190,17 +197,65 @@ export default function AdminDashboard() {
     fetchDashboardData();
   }, [fetchDashboardData]);
 
-  // Realtime subscriptions - auto refresh when any of these tables change
-  useMultiRealtime(
-    ['iuran_pembayaran', 'iuran_tagihan', 'kas', 'anggota'],
-    useCallback(() => {
-      console.log('[Dashboard] Realtime update detected, refreshing...');
-      setIsLive(true);
-      fetchDashboardData();
-      // Reset live indicator after 2 seconds
-      setTimeout(() => setIsLive(false), 2000);
-    }, [fetchDashboardData])
-  );
+  // Realtime subscriptions with status tracking
+  useEffect(() => {
+    const channel = supabase
+      .channel('admin-dashboard-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'iuran_pembayaran' },
+        () => {
+          console.log('[Dashboard] iuran_pembayaran change detected');
+          setIsLive(true);
+          fetchDashboardData();
+          setTimeout(() => setIsLive(false), 2000);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'iuran_tagihan' },
+        () => {
+          console.log('[Dashboard] iuran_tagihan change detected');
+          setIsLive(true);
+          fetchDashboardData();
+          setTimeout(() => setIsLive(false), 2000);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'kas' },
+        () => {
+          console.log('[Dashboard] kas change detected');
+          setIsLive(true);
+          fetchDashboardData();
+          setTimeout(() => setIsLive(false), 2000);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'anggota' },
+        () => {
+          console.log('[Dashboard] anggota change detected');
+          setIsLive(true);
+          fetchDashboardData();
+          setTimeout(() => setIsLive(false), 2000);
+        }
+      )
+      .subscribe((status) => {
+        console.log('[Dashboard] Realtime subscription status:', status);
+        if (status === 'SUBSCRIBED') {
+          setRealtimeStatus('connected');
+        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+          setRealtimeStatus('disconnected');
+        } else {
+          setRealtimeStatus('connecting');
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchDashboardData]);
 
   const paymentColumns = [
     {
@@ -252,17 +307,56 @@ export default function AdminDashboard() {
           title="Dashboard" 
           description="Selamat datang di panel admin RUKEM"
         />
-        <div className="flex items-center gap-2">
-          {isLive && (
-            <Badge variant="outline" className="animate-pulse bg-success/10 text-success border-success/30">
-              <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
-              Live
-            </Badge>
-          )}
-          <Badge variant="secondary" className="font-normal text-xs">
-            <Clock className="h-3 w-3 mr-1" />
-            {lastUpdate.toLocaleTimeString('id-ID')}
-          </Badge>
+        <div className="flex items-center gap-3">
+          {/* Real-time Status Indicator */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                  realtimeStatus === 'connected' 
+                    ? 'bg-success/10 text-success border border-success/30' 
+                    : realtimeStatus === 'connecting'
+                    ? 'bg-warning/10 text-warning border border-warning/30'
+                    : 'bg-destructive/10 text-destructive border border-destructive/30'
+                }`}>
+                  {realtimeStatus === 'connected' ? (
+                    <>
+                      <Radio className={`h-3 w-3 ${isLive ? 'animate-pulse' : ''}`} />
+                      <span className="hidden sm:inline">{isLive ? 'Memperbarui...' : 'Real-time Aktif'}</span>
+                      <Wifi className="h-3 w-3 sm:hidden" />
+                    </>
+                  ) : realtimeStatus === 'connecting' ? (
+                    <>
+                      <RefreshCw className="h-3 w-3 animate-spin" />
+                      <span className="hidden sm:inline">Menghubungkan...</span>
+                    </>
+                  ) : (
+                    <>
+                      <WifiOff className="h-3 w-3" />
+                      <span className="hidden sm:inline">Terputus</span>
+                    </>
+                  )}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs">
+                  {realtimeStatus === 'connected' 
+                    ? 'Data akan otomatis diperbarui saat ada perubahan'
+                    : realtimeStatus === 'connecting'
+                    ? 'Sedang menghubungkan ke server real-time...'
+                    : 'Koneksi real-time terputus. Klik Refresh untuk memuat ulang.'}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Update terakhir: {lastUpdate.toLocaleTimeString('id-ID')}
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          <Button variant="outline" size="sm" onClick={() => fetchDashboardData()}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
         </div>
       </div>
 
