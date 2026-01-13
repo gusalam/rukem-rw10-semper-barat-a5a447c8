@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { exportToExcel, exportToPDF } from '@/lib/export';
 import { ExportButtons } from '@/components/ui/export-buttons';
+import { BulkFixKKTanpaKepalaDialog } from '@/components/admin/BulkFixKKTanpaKepalaDialog';
 import { 
   AlertTriangle, 
   Users, 
@@ -20,7 +21,8 @@ import {
   CheckCircle2, 
   Loader2,
   Wrench,
-  RefreshCw
+  RefreshCw,
+  Zap
 } from 'lucide-react';
 import type { Anggota } from '@/types/database';
 
@@ -40,6 +42,7 @@ export default function ValidasiDataPage() {
   const [anggotaList, setAnggotaList] = useState<Anggota[]>([]);
   const [loading, setLoading] = useState(true);
   const [fixing, setFixing] = useState<string | null>(null);
+  const [bulkFixDialogOpen, setBulkFixDialogOpen] = useState(false);
   const { toast } = useToast();
 
   const fetchData = async () => {
@@ -307,12 +310,24 @@ export default function ValidasiDataPage() {
                     KK aktif yang tidak memiliki anggota dengan status "Kepala Keluarga"
                   </CardDescription>
                 </div>
-                {kkTanpaKepala.length > 0 && (
-                  <ExportButtons
-                    onExportPDF={() => handleExportKKTanpaKepala('pdf')}
-                    onExportExcel={() => handleExportKKTanpaKepala('excel')}
-                  />
-                )}
+                <div className="flex gap-2">
+                  {kkTanpaKepala.length > 0 && (
+                    <>
+                      <Button 
+                        variant="default" 
+                        size="sm"
+                        onClick={() => setBulkFixDialogOpen(true)}
+                      >
+                        <Zap className="h-4 w-4 mr-2" />
+                        Perbaiki Semua ({kkTanpaKepala.length})
+                      </Button>
+                      <ExportButtons
+                        onExportPDF={() => handleExportKKTanpaKepala('pdf')}
+                        onExportExcel={() => handleExportKKTanpaKepala('excel')}
+                      />
+                    </>
+                  )}
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -510,6 +525,14 @@ export default function ValidasiDataPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Bulk Fix Dialog */}
+      <BulkFixKKTanpaKepalaDialog
+        open={bulkFixDialogOpen}
+        onOpenChange={setBulkFixDialogOpen}
+        kkTanpaKepala={kkTanpaKepala}
+        onSuccess={fetchData}
+      />
     </AdminLayout>
   );
 }
