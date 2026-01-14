@@ -1,10 +1,1 @@
 project_id = "dufqdszjnorgjixelynf"
-
-[functions.create-anggota-account]
-verify_jwt = false
-
-[functions.create-penagih-account]
-verify_jwt = false
-
-[functions.delete-penagih-account]
-verify_jwt = false
