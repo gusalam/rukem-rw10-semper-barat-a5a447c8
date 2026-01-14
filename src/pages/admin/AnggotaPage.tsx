@@ -428,37 +428,29 @@ export default function AnggotaPage() {
   // Calculate total pages
   const totalPages = Math.ceil(totalCount / pageSize);
 
-  // Full columns for Excel export
+  // Full columns for Excel export - MUST match import template exactly for re-import capability
+  // Header names must match COLUMN_LABELS in ImportAnggotaDialog
+  // Values must NOT be formatted (keep raw values like 'L', 'P', 'kepala_keluarga' etc.)
   const exportColumnsExcel = [
     { key: 'nama_lengkap', header: 'Nama Lengkap' },
     { key: 'nik', header: 'NIK' },
-    { key: 'no_kk', header: 'No. KK' },
-    { key: 'jenis_kelamin', header: 'Jenis Kelamin', format: (v: string) => v === 'L' ? 'Laki-laki' : v === 'P' ? 'Perempuan' : '-' },
+    { key: 'no_kk', header: 'Nomor KK' }, // Changed from 'No. KK' to match import
+    { key: 'jenis_kelamin', header: 'Jenis Kelamin (L/P)' }, // Keep raw L/P values, no format function
     { key: 'tempat_lahir', header: 'Tempat Lahir' },
-    { key: 'tanggal_lahir', header: 'Tanggal Lahir' },
+    { key: 'tanggal_lahir', header: 'Tanggal Lahir (YYYY-MM-DD)' },
     { key: 'agama', header: 'Agama' },
     { key: 'status_perkawinan', header: 'Status Perkawinan' },
     { key: 'pekerjaan', header: 'Pekerjaan' },
-    { key: 'status_dalam_kk', header: 'Status Dalam KK', format: (v: string) => {
-      const map: Record<string, string> = {
-        'kepala_keluarga': 'Kepala Keluarga',
-        'istri': 'Istri',
-        'anak': 'Anak',
-        'orang_tua': 'Orang Tua',
-        'famili': 'Famili',
-        'lainnya': 'Lainnya',
-      };
-      return map[v] || v || '-';
-    }},
-    { key: 'alamat', header: 'Alamat' },
+    { key: 'status_dalam_kk', header: 'Status Dalam KK (kepala_keluarga/istri/anak/orang_tua/famili/lainnya)' }, // Keep raw values
+    { key: 'alamat', header: 'Alamat Lengkap' }, // Changed from 'Alamat' to match import
     { key: 'rt', header: 'RT' },
     { key: 'rw', header: 'RW' },
-    { key: 'kelurahan', header: 'Kelurahan' },
+    { key: 'kelurahan', header: 'Kelurahan/Desa' }, // Changed to match import
     { key: 'kecamatan', header: 'Kecamatan' },
-    { key: 'kabupaten_kota', header: 'Kab/Kota' },
+    { key: 'kabupaten_kota', header: 'Kabupaten/Kota' }, // Changed from 'Kab/Kota' to match import
     { key: 'provinsi', header: 'Provinsi' },
     { key: 'no_hp', header: 'No. HP' },
-    { key: 'status', header: 'Status' },
+    { key: 'status', header: 'Status Anggota (aktif/nonaktif/meninggal)' }, // Updated to match import
   ];
 
   // Simplified columns for PDF (better layout)

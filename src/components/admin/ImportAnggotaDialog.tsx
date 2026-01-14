@@ -49,6 +49,8 @@ const REQUIRED_COLUMNS = [
 // Kolom opsional dengan default value
 const OPTIONAL_COLUMNS = ['status'];
 
+// IMPORTANT: Column labels must match EXACTLY with exportColumnsExcel headers in AnggotaPage.tsx
+// This ensures export → import compatibility
 const COLUMN_LABELS: Record<string, string> = {
   nama_lengkap: 'Nama Lengkap',
   nik: 'NIK',
@@ -186,40 +188,70 @@ export function ImportAnggotaDialog({ open, onOpenChange, onSuccess }: ImportAng
         return;
       }
 
-      // Map header names to column keys
+      // Build header map - support both exact label match and key match
       const headerMap: Record<string, string> = {};
       Object.entries(COLUMN_LABELS).forEach(([key, label]) => {
-        headerMap[label.toLowerCase()] = key;
-        headerMap[key.toLowerCase()] = key;
+        // Exact match for label (case-insensitive, trimmed)
+        headerMap[label.toLowerCase().trim()] = key;
+        // Also support key match (for backwards compatibility)
+        headerMap[key.toLowerCase().trim()] = key;
+        // Support short labels (e.g., "Jenis Kelamin" matches "Jenis Kelamin (L/P)")
+        const shortLabel = label.split('(')[0].trim().toLowerCase();
+        if (shortLabel !== label.toLowerCase().trim()) {
+          headerMap[shortLabel] = key;
+        }
       });
+
+      // Validate template structure - check if at least 50% of required columns are present
+      const firstRow = jsonData[0];
+      const fileHeaders = Object.keys(firstRow).map(h => h.toLowerCase().trim());
+      const matchedColumns = REQUIRED_COLUMNS.filter(col => {
+        const label = COLUMN_LABELS[col].toLowerCase().trim();
+        const shortLabel = label.split('(')[0].trim();
+        return fileHeaders.some(h => h === label || h === col || h === shortLabel);
+      });
+
+      if (matchedColumns.length < REQUIRED_COLUMNS.length * 0.5) {
+        toast({
+          variant: 'destructive',
+          title: 'Template Tidak Sesuai',
+          description: 'Template tidak sesuai. Gunakan template hasil export sistem atau unduh template yang tersedia.',
+        });
+        return;
+      }
 
       const parsed: ParsedRow[] = jsonData.map((row, index) => {
         const normalizedRow: Record<string, string> = {};
         const errors: string[] = [];
 
-        // Normalize keys
+        // Normalize keys - match headers to column keys
         Object.entries(row).forEach(([key, value]) => {
           const normalizedKey = headerMap[key.toLowerCase().trim()];
           if (normalizedKey) {
-            normalizedRow[normalizedKey] = String(value || '').trim();
+            // Convert value to string and trim
+            normalizedRow[normalizedKey] = String(value ?? '').trim();
           }
         });
 
         // Check for missing required columns
+        const missingColumns: string[] = [];
         REQUIRED_COLUMNS.forEach(col => {
-          if (!normalizedRow[col]) {
-            errors.push(`${COLUMN_LABELS[col]} kosong`);
+          if (!normalizedRow[col] || normalizedRow[col].length === 0) {
+            missingColumns.push(COLUMN_LABELS[col].split('(')[0].trim());
           }
         });
+        if (missingColumns.length > 0) {
+          errors.push(`Kolom kosong: ${missingColumns.join(', ')}`);
+        }
 
-        // Handle status column - default ke 'aktif' jika kosong/null/tidak valid
+        // Handle status column - default to 'aktif' if empty/null/invalid
         if (!normalizedRow.status || !VALID_STATUS_VALUES.includes(normalizedRow.status.toLowerCase())) {
           normalizedRow.status = 'aktif';
         } else {
           normalizedRow.status = normalizedRow.status.toLowerCase();
         }
 
-        // Handle status_dalam_kk - normalize to lowercase
+        // Handle status_dalam_kk - normalize to lowercase and underscore
         if (normalizedRow.status_dalam_kk) {
           normalizedRow.status_dalam_kk = normalizedRow.status_dalam_kk.toLowerCase().replace(/\s+/g, '_');
           // Validate value
@@ -228,8 +260,8 @@ export function ImportAnggotaDialog({ open, onOpenChange, onSuccess }: ImportAng
           }
         }
 
-        // Validate with zod if all fields present
-        if (errors.length === 0) {
+        // Validate with zod if no missing column errors
+        if (missingColumns.length === 0) {
           const validation = rowSchema.safeParse(normalizedRow);
           if (!validation.success) {
             validation.error.errors.forEach(err => {

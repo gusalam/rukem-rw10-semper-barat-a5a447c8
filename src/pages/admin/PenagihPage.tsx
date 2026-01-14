@@ -91,32 +91,69 @@ export default function PenagihPage() {
 
   const fetchWilayahOptions = async () => {
     try {
-      // Get distinct RT/RW from anggota table
-      const { data, error } = await supabase
-        .from('anggota')
-        .select('rt, rw')
-        .not('rt', 'is', null)
-        .not('rw', 'is', null);
+      // Fetch ALL anggota RT/RW data in batches to bypass 1000 row limit
+      const batchSize = 1000;
+      let allData: { rt: string | null; rw: string | null }[] = [];
+      let from = 0;
+      let hasMore = true;
 
-      if (error) {
-        console.error('Error fetching wilayah options:', error);
-        return;
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('anggota')
+          .select('rt, rw')
+          .range(from, from + batchSize - 1);
+
+        if (error) {
+          console.error('Error fetching wilayah options:', error);
+          return;
+        }
+
+        if (data && data.length > 0) {
+          allData = [...allData, ...data];
+          from += batchSize;
+          hasMore = data.length === batchSize;
+        } else {
+          hasMore = false;
+        }
       }
 
-      if (data) {
-        // Get unique RT values
-        const uniqueRT = [...new Set(data.map(d => d.rt).filter(Boolean))].sort();
-        // Get unique RW values
-        const uniqueRW = [...new Set(data.map(d => d.rw).filter(Boolean))].sort();
+      if (allData.length > 0) {
+        // Get unique RT values - trim and filter empty/null
+        const uniqueRT = [...new Set(
+          allData
+            .map(d => d.rt?.toString().trim())
+            .filter((rt): rt is string => Boolean(rt) && rt.length > 0)
+        )].sort((a, b) => {
+          // Natural sort for numbers in strings (e.g., "1", "2", "10")
+          const numA = parseInt(a, 10);
+          const numB = parseInt(b, 10);
+          if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+          return a.localeCompare(b);
+        });
+
+        // Get unique RW values - trim and filter empty/null
+        const uniqueRW = [...new Set(
+          allData
+            .map(d => d.rw?.toString().trim())
+            .filter((rw): rw is string => Boolean(rw) && rw.length > 0)
+        )].sort((a, b) => {
+          const numA = parseInt(a, 10);
+          const numB = parseInt(b, 10);
+          if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+          return a.localeCompare(b);
+        });
+
         // Get unique RT/RW combinations
         const uniqueWilayah: WilayahOption[] = [];
         const seen = new Set<string>();
-        data.forEach(d => {
-          if (d.rt && d.rw) {
-            const key = `${d.rt}-${d.rw}`;
+        allData.forEach(d => {
+          const rt = d.rt?.toString().trim();
+          const rw = d.rw?.toString().trim();
+          if (rt && rw && rt.length > 0 && rw.length > 0) {
+            const key = `${rt}-${rw}`;
             if (!seen.has(key)) {
               seen.add(key);
-              uniqueWilayah.push({ rt: d.rt, rw: d.rw });
+              uniqueWilayah.push({ rt, rw });
             }
           }
         });
@@ -124,7 +161,13 @@ export default function PenagihPage() {
         setAvailableRT(uniqueRT);
         setAvailableRW(uniqueRW);
         setWilayahOptions(uniqueWilayah.sort((a, b) => {
+          const rwA = parseInt(a.rw, 10);
+          const rwB = parseInt(b.rw, 10);
+          if (!isNaN(rwA) && !isNaN(rwB) && rwA !== rwB) return rwA - rwB;
           if (a.rw !== b.rw) return a.rw.localeCompare(b.rw);
+          const rtA = parseInt(a.rt, 10);
+          const rtB = parseInt(b.rt, 10);
+          if (!isNaN(rtA) && !isNaN(rtB)) return rtA - rtB;
           return a.rt.localeCompare(b.rt);
         }));
       }
