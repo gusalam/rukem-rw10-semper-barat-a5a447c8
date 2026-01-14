@@ -63,12 +63,12 @@ export default function PembayaranPage() {
       // Get all no_kk from tagihan to fetch kepala keluarga
       const noKKList = [...new Set(pembayaranData?.map(p => (p.iuran_tagihan as any)?.no_kk).filter(Boolean))];
       
-      // Fetch kepala keluarga for each KK
+      // Fetch kepala keluarga for each KK (menggunakan status_dalam_kk, bukan hubungan_kk)
       const { data: anggotaData } = await supabase
         .from('anggota')
         .select('*')
         .in('no_kk', noKKList)
-        .eq('hubungan_kk', 'Kepala Keluarga');
+        .eq('status_dalam_kk', 'kepala_keluarga');
 
       // Fetch penagih profiles
       const penagihIds = [...new Set(pembayaranData?.map(p => p.penagih_user_id).filter(Boolean))];
